@@ -16,8 +16,10 @@ enum UserType {
 
 enum UserStatus {
   ACTIVE
+  UNACTIVATED
   SUSPENDED
   CLOSED
+  DELETED
 }
 
 enum MembershipTier {
@@ -33,6 +35,18 @@ enum MembershipStatus {
   EXPIRED
   SUSPENDED
   CANCELLED
+}
+
+enum StaffRole {
+  REVIEWER_OPERATOR
+  FINANCE_OFFICER
+  SYSTEM_ADMINISTRATOR
+}
+
+enum TokenPurpose {
+  ACTIVATION
+  PASSWORD_RESET
+  EMAIL_CHANGE
 }
 
 enum FileCategory {
@@ -52,16 +66,20 @@ enum FileStatus {
 // Models
 
 model User {
-  id                  String               @id @default(uuid())
-  email               String               @unique
-  passwordHash        String
-  userType            UserType
-  status              UserStatus           @default(ACTIVE)
-  createdAt           DateTime             @default(now())
-  updatedAt           DateTime             @updatedAt
-  member              Member?
-  sessions            Session[]
-  passwordResetTokens PasswordResetToken[]
+  id                 String              @id @default(uuid())
+  email              String
+  emailNormalized    String              @unique
+  passwordHash       String
+  userType           UserType
+  status             UserStatus          @default(ACTIVE)
+  failedAttemptCount Int                 @default(0)
+  lockedUntil        DateTime?
+  createdAt          DateTime            @default(now())
+  updatedAt          DateTime            @updatedAt
+  member             Member?
+  staff              Staff?
+  sessions           Session[]
+  verificationTokens VerificationToken[]
 }
 
 model Member {
@@ -108,42 +126,57 @@ model Membership {
   @@index([endDate])
 }
 
+model Staff {
+  id          String    @id @default(uuid())
+  userId      String    @unique
+  role        StaffRole
+  grantedAt   DateTime  @default(now())
+  grantedById String?
+  user        User      @relation(fields: [userId], references: [id], onDelete: Restrict)
+}
+
 model Session {
-  id             String   @id @default(uuid())
+  id             String    @id @default(uuid())
   userId         String
-  tokenHash      String   @unique
+  tokenHash      String    @unique
   ipAddress      String
   userAgent      String
-  lastActivityAt DateTime @default(now())
+  lastActivityAt DateTime  @default(now())
   expiresAt      DateTime
-  createdAt      DateTime @default(now())
-  user           User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  revokedAt      DateTime?
+  revokedReason  String?
+  createdAt      DateTime  @default(now())
+  user           User      @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId])
   @@index([lastActivityAt, expiresAt])
 }
 
 model LoginAttempt {
-  id          String   @id @default(uuid())
-  email       String
-  ipAddress   String
-  successful  Boolean
-  attemptedAt DateTime @default(now())
+  id              String   @id @default(uuid())
+  email           String
+  emailNormalized String
+  ipAddress       String
+  successful      Boolean
+  attemptedAt     DateTime @default(now())
 
   @@index([email, attemptedAt])
+  @@index([emailNormalized, attemptedAt])
   @@index([ipAddress, attemptedAt])
 }
 
-model PasswordResetToken {
-  id        String    @id @default(uuid())
-  userId    String
-  tokenHash String    @unique
-  expiresAt DateTime
-  usedAt    DateTime?
-  createdAt DateTime  @default(now())
-  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+model VerificationToken {
+  id            String       @id @default(uuid())
+  userId        String
+  purpose       TokenPurpose
+  tokenHash     String       @unique
+  expiresAt     DateTime
+  usedAt        DateTime?
+  invalidatedAt DateTime?
+  createdAt     DateTime     @default(now())
+  user          User         @relation(fields: [userId], references: [id], onDelete: Cascade)
 
-  @@index([userId, expiresAt])
+  @@index([userId, purpose, expiresAt])
 }
 
 model File {
@@ -182,4 +215,17 @@ model AuditLog {
   @@index([actorId, action])
   @@index([resource, resourceId])
   @@index([createdAt])
+}
+
+model SecurityConfig {
+  id                         Int      @id @default(1)
+  passwordMinLength          Int      @default(8)
+  lockoutThreshold           Int      @default(5)
+  lockoutWindowMinutes       Int      @default(15)
+  lockoutDurationMinutes     Int      @default(30)
+  sessionTimeoutMinutes      Int      @default(30)
+  resetTokenLifetimeMinutes  Int      @default(60)
+  activationLinkLifetimeDays Int      @default(7)
+  updatedAt                  DateTime @updatedAt
+  updatedById                String?
 }

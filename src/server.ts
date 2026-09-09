@@ -1,11 +1,6 @@
 import app from './app';
-import dotenv from 'dotenv';
+import { env } from './config/env.config';
 
-dotenv.config();
-
-const PORT = process.env['PORT'] ? parseInt(process.env['PORT'], 10) : 5000;
-
-app.listen(PORT, () => {
-  // Foundation server startup listener
-  console.log(`[Server]: Repository Foundation API running on port ${PORT}`);
+app.listen(env.PORT, () => {
+  console.log(`[Server]: IBDL Freelancers Hub API running on port ${env.PORT} [${env.NODE_ENV}]`);
 });
