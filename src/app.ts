@@ -10,6 +10,9 @@ import {
 } from './shared/middleware';
 import { NotFoundError } from './shared/errors';
 
+import { membersRouter } from './modules/members/presentation/members.routes';
+import { authRouter } from './modules/auth/presentation/auth.routes';
+
 const app: Express = express();
 
 // 1. Request ID Generation Middleware
@@ -47,7 +50,11 @@ app.get('/health', (_req: Request, res: Response) => {
   });
 });
 
-// 9. Catch-All 404 Route Handler
+// 9. API Module Routes
+app.use('/api/v1/members', membersRouter);
+app.use('/api/v1/auth', authRouter);
+
+// 10. Catch-All 404 Route Handler
 app.use((req: Request, _res: Response, next: NextFunction) => {
   next(new NotFoundError(`Route ${req.method} ${req.originalUrl} not found`));
 });
