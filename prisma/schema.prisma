@@ -1,0 +1,185 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// Enums
+
+enum UserType {
+  MEMBER
+  STAFF
+}
+
+enum UserStatus {
+  ACTIVE
+  SUSPENDED
+  CLOSED
+}
+
+enum MembershipTier {
+  ESSENTIAL
+  PROFESSIONAL
+  MASTER
+}
+
+enum MembershipStatus {
+  PENDING_PAYMENT
+  ACTIVE
+  GRACE_PERIOD
+  EXPIRED
+  SUSPENDED
+  CANCELLED
+}
+
+enum FileCategory {
+  CV
+  PROFILE_PHOTO
+  SUPPORTING_DOC
+}
+
+enum FileStatus {
+  QUARANTINED
+  ACTIVE
+  REJECTED_MALWARE
+  SUPERSEDED
+  ARCHIVED
+}
+
+// Models
+
+model User {
+  id                  String               @id @default(uuid())
+  email               String               @unique
+  passwordHash        String
+  userType            UserType
+  status              UserStatus           @default(ACTIVE)
+  createdAt           DateTime             @default(now())
+  updatedAt           DateTime             @updatedAt
+  member              Member?
+  sessions            Session[]
+  passwordResetTokens PasswordResetToken[]
+}
+
+model Member {
+  id                    String       @id @default(uuid())
+  userId                String       @unique
+  fullNameEn            String
+  fullNameAr            String?
+  phone                 String
+  phoneNormalized       String       @unique
+  country               String
+  city                  String?
+  yearsOfExperience     String
+  areasOfExpertise      String[]
+  industriesServed      String[]
+  languages             String[]
+  bioEn                 String?      @db.Text
+  bioAr                 String?      @db.Text
+  linkedinUrl           String?
+  photoFileId           String?
+  directoryOptIn        Boolean      @default(false)
+  profileCompletionRate Int          @default(0)
+  createdAt             DateTime     @default(now())
+  updatedAt             DateTime     @updatedAt
+  user                  User         @relation(fields: [userId], references: [id], onDelete: Restrict)
+  memberships           Membership[]
+  files                 File[]
+
+  @@index([country, directoryOptIn, profileCompletionRate])
+}
+
+model Membership {
+  id        String           @id @default(uuid())
+  memberId  String
+  tier      MembershipTier   @default(ESSENTIAL)
+  status    MembershipStatus @default(ACTIVE)
+  price     Decimal          @default(0.0) @db.Decimal(10, 2)
+  startDate DateTime         @default(now())
+  endDate   DateTime
+  createdAt DateTime         @default(now())
+  updatedAt DateTime         @updatedAt
+  member    Member           @relation(fields: [memberId], references: [id], onDelete: Restrict)
+
+  @@index([memberId, status])
+  @@index([endDate])
+}
+
+model Session {
+  id             String   @id @default(uuid())
+  userId         String
+  tokenHash      String   @unique
+  ipAddress      String
+  userAgent      String
+  lastActivityAt DateTime @default(now())
+  expiresAt      DateTime
+  createdAt      DateTime @default(now())
+  user           User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([lastActivityAt, expiresAt])
+}
+
+model LoginAttempt {
+  id          String   @id @default(uuid())
+  email       String
+  ipAddress   String
+  successful  Boolean
+  attemptedAt DateTime @default(now())
+
+  @@index([email, attemptedAt])
+  @@index([ipAddress, attemptedAt])
+}
+
+model PasswordResetToken {
+  id        String    @id @default(uuid())
+  userId    String
+  tokenHash String    @unique
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime  @default(now())
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, expiresAt])
+}
+
+model File {
+  id           String       @id @default(uuid())
+  ownerId      String
+  category     FileCategory
+  originalName String
+  storageKey   String       @unique
+  mimeType     String
+  sizeBytes    Int
+  status       FileStatus   @default(QUARANTINED)
+  scanResult   String?
+  supersededAt DateTime?
+  createdAt    DateTime     @default(now())
+  updatedAt    DateTime     @updatedAt
+  owner        Member       @relation(fields: [ownerId], references: [id], onDelete: Restrict)
+
+  @@index([ownerId, category, status])
+}
+
+model AuditLog {
+  id             String   @id @default(uuid())
+  sequenceNumber BigInt   @unique @default(autoincrement())
+  actorId        String?
+  actorRole      String?
+  action         String
+  resource       String
+  resourceId     String?
+  previousState  Json?
+  newState       Json?
+  reason         String?
+  ipAddress      String?
+  requestId      String?
+  createdAt      DateTime @default(now())
+
+  @@index([actorId, action])
+  @@index([resource, resourceId])
+  @@index([createdAt])
+}
