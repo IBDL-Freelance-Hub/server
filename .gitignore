@@ -27,3 +27,4 @@ coverage/
 
 # Docker volumes
 postgres_data/
+node_modules
