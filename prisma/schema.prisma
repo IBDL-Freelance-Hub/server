@@ -63,6 +63,12 @@ enum FileStatus {
   ARCHIVED
 }
 
+enum AssessmentCredentialStatus {
+  AVAILABLE
+  ASSIGNED
+  EXHAUSTED
+}
+
 // Models
 
 model User {
@@ -165,6 +171,17 @@ model LoginAttempt {
   @@index([ipAddress, attemptedAt])
 }
 
+model TokenRequestLog {
+  id         String       @id @default(uuid())
+  purpose    TokenPurpose
+  email      String       // normalized/lowercase
+  ipAddress  String
+  requestedAt DateTime    @default(now())
+
+  @@index([email, purpose, requestedAt])
+  @@index([ipAddress, purpose, requestedAt])
+}
+
 model VerificationToken {
   id            String       @id @default(uuid())
   userId        String
@@ -218,14 +235,33 @@ model AuditLog {
 }
 
 model SecurityConfig {
-  id                         Int      @id @default(1)
-  passwordMinLength          Int      @default(8)
-  lockoutThreshold           Int      @default(5)
-  lockoutWindowMinutes       Int      @default(15)
-  lockoutDurationMinutes     Int      @default(30)
-  sessionTimeoutMinutes      Int      @default(30)
-  resetTokenLifetimeMinutes  Int      @default(60)
-  activationLinkLifetimeDays Int      @default(7)
-  updatedAt                  DateTime @updatedAt
-  updatedById                String?
+  id                                   Int      @id @default(1)
+  passwordMinLength                    Int      @default(8)
+  lockoutThreshold                     Int      @default(5)
+  lockoutWindowMinutes                 Int      @default(15)
+  lockoutDurationMinutes               Int      @default(30)
+  sessionTimeoutMinutes                Int      @default(30)
+  resetTokenLifetimeMinutes            Int      @default(60)
+  activationLinkLifetimeMinutes        Int      @default(10)
+  tokenRequestMaxPerEmail              Int      @default(5)
+  tokenRequestWindowMinutesPerEmail    Int      @default(60)
+  tokenRequestMaxPerIp                 Int      @default(10)
+  tokenRequestWindowMinutesPerIp       Int      @default(60)
+  unactivatedRetentionMonths           Int      @default(12)
+  unactivatedReminderDaysBeforeCutoff Int      @default(7)
+  updatedAt                            DateTime @updatedAt
+  updatedById                          String?
+}
+
+model AssessmentCredentialPool {
+  id          String                     @id @default(cuid())
+  username    String                     @unique
+  password    String
+  accessUrl   String?
+  status      AssessmentCredentialStatus @default(AVAILABLE)
+  assignedTo  String?
+  assignedAt  DateTime?
+  createdAt   DateTime                   @default(now())
+
+  @@index([status])
 }
