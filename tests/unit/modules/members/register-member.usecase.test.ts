@@ -1,10 +1,12 @@
 import { PrismaClient } from '@prisma/client';
 import { RegisterMemberUseCase } from '../../../../src/modules/members/application/register-member.usecase';
 import { RegisterMemberInput } from '../../../../src/modules/members/presentation/members.schema';
-import { ConflictError } from '../../../../src/shared/errors';
+import { ConflictError, ValidationError } from '../../../../src/shared/errors';
+import { IEmailProvider } from '../../../../src/shared/providers';
 
 describe('RegisterMemberUseCase Unit Tests', () => {
   let mockPrisma: jest.Mocked<PrismaClient>;
+  let mockEmailProvider: jest.Mocked<IEmailProvider>;
   let useCase: RegisterMemberUseCase;
 
   const validRegistrationInput: RegisterMemberInput = {
@@ -38,10 +40,23 @@ describe('RegisterMemberUseCase Unit Tests', () => {
       $transaction: jest.fn(),
     } as unknown as jest.Mocked<PrismaClient>;
 
-    useCase = new RegisterMemberUseCase(mockPrisma);
+    mockEmailProvider = {
+      sendEmail: jest.fn().mockResolvedValue(undefined),
+    };
+
+    useCase = new RegisterMemberUseCase(mockPrisma, mockEmailProvider);
   });
 
-  it('should successfully register a member and return PQP specimen credentials & details', async () => {
+  it('should throw ValidationError if termsAccepted is false', async () => {
+    const invalidInput = {
+      ...validRegistrationInput,
+      termsAccepted: false,
+    } as unknown as RegisterMemberInput;
+
+    await expect(useCase.execute(invalidInput)).rejects.toThrow(ValidationError);
+  });
+
+  it('should successfully register a member, record 3 policy acceptances, dispatch email and fallback when pool is empty', async () => {
     // No duplicate found
     (mockPrisma.user.findUnique as jest.Mock).mockResolvedValue(null);
     (mockPrisma.member.findUnique as jest.Mock).mockResolvedValue(null);
@@ -63,13 +78,23 @@ describe('RegisterMemberUseCase Unit Tests', () => {
       country: 'Egypt',
     };
 
+    const auditLogCalls: Record<string, unknown>[] = [];
     // $transaction callback execution simulation
     (mockPrisma.$transaction as jest.Mock).mockImplementation(async (callback) => {
+      const mockAuditCreate = jest.fn().mockImplementation((args) => {
+        auditLogCalls.push(args.data);
+        return Promise.resolve({});
+      });
+
       const tx = {
         user: { create: jest.fn().mockResolvedValue(mockUser) },
         member: { create: jest.fn().mockResolvedValue(mockMember) },
         membership: { create: jest.fn().mockResolvedValue({}) },
-        auditLog: { create: jest.fn().mockResolvedValue({}) },
+        auditLog: { create: mockAuditCreate },
+        assessmentCredentialPool: {
+          findFirst: jest.fn().mockResolvedValue(null),
+          update: jest.fn(),
+        },
       };
       return callback(tx);
     });
@@ -85,9 +110,71 @@ describe('RegisterMemberUseCase Unit Tests', () => {
     expect(result.membership.tier).toBe('Essential Membership');
     expect(result.membership.fee).toBe('Free');
     expect(result.pqpAccess.username).toBe('flh.marwa');
-    expect(result.pqpAccess.password).toBe('PQP-2026-DEMO');
-    expect(result.pqpAccess.assessmentLink).toBe('pqp.ibdl.net/start');
+    expect(result.pqpAccess.password).toBe('ASSESSMENT-2026-DEMO');
+    expect(result.pqpAccess.assessmentLink).toBe('https://assessment.ibdl.net/start');
     expect(result.welcomeEmail.from).toBe('freelancers.hub@ibdl.net');
+
+    // Assert 3 policy acceptances recorded in audit log (SEC-13, SEC-14)
+    const policyAcceptanceAudits = auditLogCalls.filter((a) => a.action === 'POLICY_ACCEPTED');
+    expect(policyAcceptanceAudits).toHaveLength(3);
+
+    const policyTypes = policyAcceptanceAudits.map(
+      (a) => (a.newState as { policyType: string }).policyType,
+    );
+    expect(policyTypes).toEqual(['PRIVACY_POLICY', 'TERMS_OF_USE', 'COOKIE_POLICY']);
+
+    // Assert welcome email dispatch with PQP credentials (NTF-31)
+    expect(mockEmailProvider.sendEmail).toHaveBeenCalledWith(
+      expect.objectContaining({
+        to: 'marwa.ashraf@example.com',
+        subject: 'Your complimentary PQP™ access is ready',
+      }),
+    );
+  });
+
+  it('should claim pre-generated credential from pool when AVAILABLE credentials exist', async () => {
+    (mockPrisma.user.findUnique as jest.Mock).mockResolvedValue(null);
+    (mockPrisma.member.findUnique as jest.Mock).mockResolvedValue(null);
+
+    const mockUser = {
+      id: 'user-uuid-2',
+      email: 'marwa.ashraf@example.com',
+      emailNormalized: 'marwa.ashraf@example.com',
+    };
+    const mockMember = {
+      id: 'member-uuid-2',
+      userId: 'user-uuid-2',
+      fullNameEn: 'Marwa Ashraf',
+    };
+
+    const mockPoolCredential = {
+      id: 'pool-cred-99',
+      username: 'pqp_real_user_88',
+      password: 'RealSecretPassword99',
+      accessUrl: 'pqp.ibdl.net/real-portal',
+      status: 'AVAILABLE',
+    };
+
+    (mockPrisma.$transaction as jest.Mock).mockImplementation(async (callback) => {
+      const tx = {
+        user: { create: jest.fn().mockResolvedValue(mockUser) },
+        member: { create: jest.fn().mockResolvedValue(mockMember) },
+        membership: { create: jest.fn().mockResolvedValue({}) },
+        auditLog: { create: jest.fn().mockResolvedValue({}) },
+        assessmentCredentialPool: {
+          findFirst: jest.fn().mockResolvedValue(mockPoolCredential),
+          update: jest.fn().mockResolvedValue({}),
+        },
+      };
+      return callback(tx);
+    });
+
+    const result = await useCase.execute(validRegistrationInput);
+
+    expect(result.pqpAccess.username).toBe('pqp_real_user_88');
+    expect(result.pqpAccess.password).toBe('RealSecretPassword99');
+    expect(result.pqpAccess.assessmentLink).toBe('pqp.ibdl.net/real-portal');
+    expect(result.pqpAccess.note).toBe('Live pre-generated assessment voucher claimed from pool.');
   });
 
   it('should throw ConflictError with clashType "email" when email is already registered', async () => {

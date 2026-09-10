@@ -1,10 +1,15 @@
 import crypto from 'crypto';
 import { PrismaClient } from '@prisma/client';
-import { prisma as defaultPrisma } from '../../../shared/providers';
-import { ConflictError } from '../../../shared/errors';
+import {
+  prisma as defaultPrisma,
+  emailProvider as defaultEmailProvider,
+  IEmailProvider,
+} from '../../../shared/providers';
+import { ConflictError, ValidationError } from '../../../shared/errors';
 import { normalizeEmail } from '../../../shared/utils';
 import { normalizePhoneNumber, calculateProfileCompletion } from '../domain';
 import { RegisterMemberInput } from '../presentation/members.schema';
+import { claimAssessmentCredential } from '../infrastructure/assessment-pool.service';
 
 export interface RegisterMemberContext {
   requestId?: string;
@@ -39,12 +44,20 @@ export interface RegisterMemberSuccessOutput {
 }
 
 export class RegisterMemberUseCase {
-  constructor(private readonly prisma: PrismaClient = defaultPrisma) {}
+  constructor(
+    private readonly prisma: PrismaClient = defaultPrisma,
+    private readonly emailSvc: IEmailProvider = defaultEmailProvider,
+  ) {}
 
   async execute(
     input: RegisterMemberInput,
     context?: RegisterMemberContext,
   ): Promise<RegisterMemberSuccessOutput> {
+    // Affirmative consent validation (SEC-13)
+    if (!input.termsAccepted) {
+      throw new ValidationError('You must agree to the terms to complete registration.');
+    }
+
     const emailNormalized = normalizeEmail(input.email);
     const phoneNormalized = normalizePhoneNumber(input.mobile, input.country);
 
@@ -90,7 +103,7 @@ export class RegisterMemberUseCase {
     endDate.setFullYear(endDate.getFullYear() + 1);
 
     // Atomic Transaction ($transaction)
-    const { user, member } = await this.prisma.$transaction(async (tx) => {
+    const { user, member, claimedCredential } = await this.prisma.$transaction(async (tx) => {
       const createdUser = await tx.user.create({
         data: {
           email: input.email,
@@ -129,6 +142,28 @@ export class RegisterMemberUseCase {
         },
       });
 
+      // Write Three Distinct Policy Acceptance Audit Records (SEC-13, SEC-14)
+      const policyTypes = ['PRIVACY_POLICY', 'TERMS_OF_USE', 'COOKIE_POLICY'] as const;
+      for (const policyType of policyTypes) {
+        await tx.auditLog.create({
+          data: {
+            actorId: createdUser.id,
+            actorRole: 'MEMBER',
+            action: 'POLICY_ACCEPTED',
+            resource: 'PolicyAcceptance',
+            resourceId: createdUser.id,
+            newState: {
+              policyType,
+              version: 'v1.0',
+              language: 'en',
+              acceptedAt: startDate.toISOString(),
+            },
+            requestId: context?.requestId,
+            ipAddress: context?.ipAddress,
+          },
+        });
+      }
+
       await tx.auditLog.create({
         data: {
           actorId: createdUser.id,
@@ -147,13 +182,38 @@ export class RegisterMemberUseCase {
         },
       });
 
-      return { user: createdUser, member: createdMember };
+      // Pre-generated Assessment Credential Pool Claim (REG-64, REG-65)
+      const rawFirst = input.fullName.trim().split(/\s+/)[0] || 'demo';
+      const cleanFirst = rawFirst.toLowerCase().replace(/[^a-z]/g, '') || 'demo';
+      const fallbackUsername = `flh.${cleanFirst}`;
+
+      const credential = await claimAssessmentCredential(tx, createdUser.id, fallbackUsername);
+
+      return { user: createdUser, member: createdMember, claimedCredential: credential };
     });
 
-    // PQP Specimen Generation (REG-64 to REG-66, SCR-19)
-    const rawFirst = input.fullName.trim().split(/\s+/)[0] || 'demo';
-    const cleanFirst = rawFirst.toLowerCase().replace(/[^a-z]/g, '') || 'demo';
-    const pqpUsername = `flh.${cleanFirst}`;
+    const pqpNote = claimedCredential.isPoolExhausted
+      ? 'Specimen credentials for demonstration only — no PQP account exists and nothing is connected to a live assessment service.'
+      : 'Live pre-generated assessment voucher claimed from pool.';
+
+    // Dispatch welcome email with claimed PQP credentials (NTF-31)
+    await this.emailSvc.sendEmail({
+      to: user.email,
+      subject: 'Your complimentary PQP™ access is ready',
+      html: `
+        <div style="font-family: Arial, sans-serif; padding: 20px; color: #333; max-width: 600px; margin: 0 auto; border: 1px solid #e0e0e0; border-radius: 8px;">
+          <h2 style="color: #0056b3;">Welcome to IBDL Freelancers Hub</h2>
+          <p>Hello ${member.fullNameEn},</p>
+          <p>Your complimentary PQP™ assessment access details:</p>
+          <ul>
+            <li><strong>Username:</strong> ${claimedCredential.username}</li>
+            <li><strong>Password:</strong> ${claimedCredential.password}</li>
+            <li><strong>Assessment Link:</strong> <a href="https://${claimedCredential.accessUrl}">${claimedCredential.accessUrl}</a></li>
+          </ul>
+          <p style="font-size: 12px; color: #777;">Note: ${pqpNote}</p>
+        </div>
+      `,
+    });
 
     return {
       member: {
@@ -170,10 +230,10 @@ export class RegisterMemberUseCase {
         renewsOn: endDate.toISOString(),
       },
       pqpAccess: {
-        username: pqpUsername,
-        password: 'PQP-2026-DEMO',
-        assessmentLink: 'pqp.ibdl.net/start',
-        note: 'Specimen credentials for demonstration only — no PQP account exists and nothing is connected to a live assessment service.',
+        username: claimedCredential.username,
+        password: claimedCredential.password,
+        assessmentLink: claimedCredential.accessUrl,
+        note: pqpNote,
       },
       welcomeEmail: {
         from: 'freelancers.hub@ibdl.net',

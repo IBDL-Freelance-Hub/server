@@ -37,3 +37,24 @@ export const registerMemberSchema = z.object({
 });
 
 export type RegisterMemberInput = z.infer<typeof registerMemberSchema>;
+
+export const checkDuplicateSchema = z
+  .object({
+    email: z.string().trim().optional(),
+    mobile: z.string().trim().optional(),
+    country: z.string().trim().optional(),
+  })
+  .refine(
+    (data) => {
+      if (data.mobile && (!data.country || data.country.trim().length === 0)) {
+        return false;
+      }
+      return true;
+    },
+    {
+      message: 'Country is required when mobile number is provided.',
+      path: ['country'],
+    },
+  );
+
+export type CheckDuplicateInput = z.infer<typeof checkDuplicateSchema>;

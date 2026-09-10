@@ -1,4 +1,7 @@
-import { registerMemberSchema } from '../../../../src/modules/members/presentation/members.schema';
+import {
+  registerMemberSchema,
+  checkDuplicateSchema,
+} from '../../../../src/modules/members/presentation/members.schema';
 
 describe('Member Registration Zod Schema Unit Tests', () => {
   const validPayload = {
@@ -116,5 +119,31 @@ describe('Member Registration Zod Schema Unit Tests', () => {
       linkedinUrl: 'invalid-url-string',
     };
     expect(registerMemberSchema.safeParse(invalidUrlPayload).success).toBe(false);
+  });
+
+  describe('checkDuplicateSchema Validation Tests', () => {
+    it('should pass when only email is provided', () => {
+      const res = checkDuplicateSchema.safeParse({ email: 'user@example.com' });
+      expect(res.success).toBe(true);
+    });
+
+    it('should pass when both mobile and country are provided', () => {
+      const res = checkDuplicateSchema.safeParse({ mobile: '1001234567', country: 'EG' });
+      expect(res.success).toBe(true);
+    });
+
+    it('should fail when mobile is provided without country', () => {
+      const res = checkDuplicateSchema.safeParse({ mobile: '1001234567' });
+      expect(res.success).toBe(false);
+      if (!res.success) {
+        const issue = res.error.issues.find((i) => i.path.join('.') === 'country');
+        expect(issue?.message).toBe('Country is required when mobile number is provided.');
+      }
+    });
+
+    it('should fail when mobile is provided with empty whitespace country', () => {
+      const res = checkDuplicateSchema.safeParse({ mobile: '1001234567', country: '   ' });
+      expect(res.success).toBe(false);
+    });
   });
 });
