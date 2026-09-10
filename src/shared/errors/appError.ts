@@ -50,3 +50,11 @@ export class BusinessRuleError extends AppError {
     super(message, 422, 'BUSINESS_RULE_VIOLATION', details);
   }
 }
+
+export class TooManyRequestsError extends AppError {
+  constructor(message = 'Too Many Requests', details?: unknown) {
+    super(message, 429, 'TOO_MANY_REQUESTS', details);
+  }
+}
+
+export class RateLimitError extends TooManyRequestsError {}

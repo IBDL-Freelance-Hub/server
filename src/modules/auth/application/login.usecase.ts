@@ -74,7 +74,7 @@ export class LoginUseCase {
       });
 
       // Generic authentication error to prevent enumeration (AUT-09, SEC-23)
-      throw new AuthenticationError('Invalid email or password.');
+      throw new AuthenticationError('That email address and password do not match an account.');
     }
 
     // 4. Check account status

@@ -1,6 +1,7 @@
 import {
   passwordSchema,
   activateAccountSchema,
+  resendActivationSchema,
   loginSchema,
   PASSWORD_ERROR_MESSAGE,
 } from '../../../../src/modules/auth/presentation/auth.schema';
@@ -47,28 +48,36 @@ describe('Auth Validation Schemas Unit Tests', () => {
 
   describe('Activate Account Schema', () => {
     const validActivationPayload = {
-      email: 'user@example.com',
+      token: 'raw-activation-token-12345',
       password: 'Password123',
       confirmPassword: 'Password123',
     };
 
-    it('should pass when password and confirmPassword match', () => {
+    it('should pass when token, password and confirmPassword are provided', () => {
       const result = activateAccountSchema.safeParse(validActivationPayload);
       expect(result.success).toBe(true);
     });
 
-    it('should fail when password and confirmPassword do not match', () => {
+    it('should fail when token is missing or empty', () => {
       const payload = {
         ...validActivationPayload,
-        confirmPassword: 'DifferentPassword123',
+        token: '',
       };
 
       const result = activateAccountSchema.safeParse(payload);
       expect(result.success).toBe(false);
-      if (!result.success) {
-        const issue = result.error.issues.find((i) => i.path.join('.') === 'confirmPassword');
-        expect(issue?.message).toBe('Passwords do not match.');
-      }
+    });
+  });
+
+  describe('Resend Activation Schema', () => {
+    it('should pass for a valid email payload', () => {
+      const result = resendActivationSchema.safeParse({ email: 'user@example.com' });
+      expect(result.success).toBe(true);
+    });
+
+    it('should fail for an invalid email', () => {
+      const result = resendActivationSchema.safeParse({ email: 'invalid-email' });
+      expect(result.success).toBe(false);
     });
   });
 

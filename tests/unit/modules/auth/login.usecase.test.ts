@@ -2,7 +2,7 @@ import { PrismaClient } from '@prisma/client';
 import { LoginUseCase } from '../../../../src/modules/auth/application/login.usecase';
 import { IHashProvider } from '../../../../src/shared/providers';
 import { SessionService } from '../../../../src/modules/auth/infrastructure/session.service';
-import { AuthenticationError, AuthorizationError } from '../../../../src/shared/errors';
+import { AuthorizationError } from '../../../../src/shared/errors';
 
 describe('LoginUseCase Unit Tests', () => {
   let mockPrisma: jest.Mocked<PrismaClient>;
@@ -82,7 +82,7 @@ describe('LoginUseCase Unit Tests', () => {
         email: 'user@example.com',
         password: 'WrongPassword123',
       }),
-    ).rejects.toThrow(AuthenticationError);
+    ).rejects.toThrow('That email address and password do not match an account.');
 
     expect(mockPrisma.loginAttempt.create).toHaveBeenCalledWith(
       expect.objectContaining({
