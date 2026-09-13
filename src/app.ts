@@ -2,7 +2,9 @@ import express, { Express, Request, Response, NextFunction } from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
 import cookieParser from 'cookie-parser';
+import swaggerUi from 'swagger-ui-express';
 import { env } from './config/env.config';
+import { swaggerSpec } from './config/swagger.config';
 import {
   requestIdMiddleware,
   languageMiddleware,
@@ -18,10 +20,18 @@ const app: Express = express();
 // 1. Request ID Generation Middleware
 app.use(requestIdMiddleware);
 
-// 2. HTTP Security Headers (Safe defaults for local dev & cross-origin assets)
+// 2. HTTP Security Headers (Safe defaults for local dev, Swagger UI & cross-origin assets)
 app.use(
   helmet({
     crossOriginResourcePolicy: { policy: 'cross-origin' },
+    contentSecurityPolicy: {
+      directives: {
+        ...helmet.contentSecurityPolicy.getDefaultDirectives(),
+        'img-src': ["'self'", 'data:', 'https:'],
+        'script-src': ["'self'", "'unsafe-inline'", "'unsafe-eval'"],
+        'style-src': ["'self'", "'unsafe-inline'"],
+      },
+    },
   }),
 );
 
@@ -58,7 +68,15 @@ app.get('/health', (_req: Request, res: Response) => {
   });
 });
 
-// 9. API Module Routes
+// 9. Swagger API Documentation Endpoints
+app.get('/api-docs.json', (_req: Request, res: Response) => {
+  res.setHeader('Content-Type', 'application/json');
+  res.send(swaggerSpec);
+});
+
+app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec));
+
+// 10. API Module Routes
 app.use('/api/v1/members', membersRouter);
 app.use('/api/v1/auth', authRouter);
 
