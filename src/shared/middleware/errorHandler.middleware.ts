@@ -16,15 +16,19 @@ export const errorHandlerMiddleware = (
       console.warn(`[AppError] [${requestId}] ${err.code} (${err.statusCode}): ${err.message}`);
     }
 
+    const title =
+      (err as unknown as Record<string, unknown>).title ||
+      ((err.details as unknown as Record<string, unknown>)?.title as string) ||
+      undefined;
+
     res.status(err.statusCode).json({
       success: false,
-      error: {
-        code: err.code,
-        message: err.message,
-        details: err.details ?? null,
-        requestId,
-        timestamp,
-      },
+      code: err.code,
+      title,
+      message: err.message,
+      details: err.details ?? null,
+      requestId,
+      timestamp,
     });
     return;
   }
