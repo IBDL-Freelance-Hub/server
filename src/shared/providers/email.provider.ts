@@ -32,16 +32,41 @@ export class ResendEmailProvider implements IEmailProvider {
       return;
     }
 
+    let targetEmail = to;
+    if (process.env.NODE_ENV === 'development' && process.env.RESEND_TEST_RECIPIENT) {
+      targetEmail = process.env.RESEND_TEST_RECIPIENT;
+    }
+
     const fromAddress = process.env.EMAIL_FROM || 'IBDL Freelancer Hub <onboarding@resend.dev>';
 
     try {
-      await this.resendClient.emails.send({
+      const response = await this.resendClient.emails.send({
         from: fromAddress,
-        to,
+        to: targetEmail,
         subject,
         html,
       });
-    } catch (error) {
+
+      if (response.error) {
+        console.error('[Resend API Error]:', response.error);
+
+        const isResendRestriction =
+          response.error.name === 'validation_error' ||
+          (response.error as { statusCode?: number }).statusCode === 403 ||
+          response.error.message?.includes('only send testing emails');
+
+        if (isResendRestriction && process.env.NODE_ENV === 'development') {
+          console.warn(
+            `[EmailProvider Resend Sandbox Restriction] Email to '${to}' failed because Resend test mode only permits sending to your registered account (ashrafmarwa987@gmail.com).`,
+          );
+          return;
+        }
+
+        throw new Error(response.error.message || 'Failed to send email via Resend');
+      }
+
+      console.log(`[Resend Email Sent Successfully]: to=${targetEmail}, id=${response.data?.id}`);
+    } catch (error: unknown) {
       console.error('[EmailProvider Error] Failed to send email via Resend:', error);
       throw error;
     }

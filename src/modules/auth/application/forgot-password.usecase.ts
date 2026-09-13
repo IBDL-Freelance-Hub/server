@@ -12,6 +12,8 @@ import {
 } from '../infrastructure/token-rate-limiter.service';
 import { ForgotPasswordInput } from '../presentation/auth.schema';
 
+import { buildBrandEmailHtml } from '../../../shared/templates/email-template';
+
 export interface ForgotPasswordResult {
   success: boolean;
   message: string;
@@ -106,21 +108,18 @@ export class ForgotPasswordUseCase {
       await this.emailSvc.sendEmail({
         to: user.email,
         subject: 'Reset Your IBDL Freelancer Hub Password',
-        html: `
-          <div style="font-family: Arial, sans-serif; padding: 20px; color: #333; max-width: 600px; margin: 0 auto; border: 1px solid #e0e0e0; border-radius: 8px;">
-            <h2 style="color: #0056b3;">Password Reset Request</h2>
+        html: buildBrandEmailHtml({
+          title: 'Password Reset Request',
+          preheader: 'We received a request to reset your IBDL Freelancer Hub password.',
+          contentHtml: `
             <p>Hello,</p>
-            <p>We received a request to reset the password for your IBDL Freelancer Hub account.</p>
-            <p>Click the button below to reset your password:</p>
-            <div style="text-align: center; margin: 30px 0;">
-              <a href="${resetLink}" style="background-color: #0056b3; color: white; padding: 12px 28px; text-decoration: none; border-radius: 6px; font-weight: bold; display: inline-block;">Reset Password</a>
-            </div>
-            <p style="font-size: 13px; color: #666;">Or copy and paste this link into your browser:</p>
-            <p style="font-size: 13px; color: #0056b3; word-break: break-all;">${resetLink}</p>
-            <hr style="border: none; border-top: 1px solid #eee; margin: 20px 0;" />
-            <p style="font-size: 12px; color: #999;">This link will expire in <strong>${lifetimeMinutes} minutes</strong>. If you did not request a password reset, you can safely ignore this email.</p>
-          </div>
-        `,
+            <p>We received a request to reset the password for your <strong>IBDL Freelancer Hub</strong> account.</p>
+            <p>Please click the button below to choose a new password:</p>
+          `,
+          ctaText: 'Reset Password',
+          ctaUrl: resetLink,
+          footnote: `This reset link will expire in <strong>${lifetimeMinutes} minutes</strong>. If you did not request a password reset, you can safely ignore this email.`,
+        }),
       });
     }
 

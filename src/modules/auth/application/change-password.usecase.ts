@@ -13,6 +13,8 @@ import {
 } from '../infrastructure/session.service';
 import { ChangePasswordInput } from '../presentation/auth.schema';
 
+import { buildBrandEmailHtml } from '../../../shared/templates/email-template';
+
 export interface ChangePasswordContext {
   userId: string;
   currentSessionId?: string;
@@ -106,17 +108,19 @@ export class ChangePasswordUseCase {
     await this.emailSvc.sendEmail({
       to: user.email,
       subject: 'Security Notice: Your Password Has Been Changed',
-      html: `
-        <div style="font-family: Arial, sans-serif; padding: 20px; color: #333; max-width: 600px; margin: 0 auto; border: 1px solid #e0e0e0; border-radius: 8px;">
-          <h2 style="color: #0056b3;">Security Notification</h2>
+      html: buildBrandEmailHtml({
+        title: 'Password Changed Successfully',
+        preheader: 'Your IBDL Freelancer Hub account password was updated.',
+        contentHtml: `
           <p>Hello,</p>
           <p>Your password for your <strong>IBDL Freelancer Hub</strong> account was changed successfully.</p>
           <p>If you made this change, no further action is required.</p>
-          <p style="color: #d9534f; font-weight: bold;">If you did not perform this password change, please contact support immediately to secure your account.</p>
-          <hr style="border: none; border-top: 1px solid #eee; margin: 20px 0;" />
-          <p style="font-size: 12px; color: #999;">IBDL Freelancer Hub Security Team</p>
-        </div>
-      `,
+          <p style="color: #E11119; font-weight: bold; background: #FFF5F5; padding: 12px 16px; border-radius: 8px; border-left: 4px solid #E11119;">
+            If you did not perform this password change, please contact support immediately to secure your account.
+          </p>
+        `,
+        footnote: 'IBDL Freelancer Hub Security Team',
+      }),
     });
 
     return {

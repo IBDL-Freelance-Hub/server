@@ -15,9 +15,11 @@ import {
   sessionService as defaultSessionService,
 } from '../infrastructure/session.service';
 import { LoginInput } from '../presentation/auth.schema';
+import { buildBrandEmailHtml } from '../../../shared/templates/email-template';
 
 export interface LoginUseCaseResult {
   sessionToken: string;
+  sessionTimeoutMinutes: number;
   user: {
     id: string;
     email: string;
@@ -136,14 +138,25 @@ export class LoginUseCase {
       if (isNowLocked) {
         // Send SEC-22 security notification email ONLY if account is real (POINT 4)
         if (user) {
+          const lockoutSubject =
+            lang === 'ar'
+              ? 'تنبيه أمني: تم قفل الحساب مؤقتاً'
+              : 'Security Notice: Account Temporarily Locked';
+          const lockoutTitle =
+            lang === 'ar' ? LOCKED_ACCOUNT_DETAILS.titleAr : LOCKED_ACCOUNT_DETAILS.title;
+          const lockoutBody =
+            lang === 'ar' ? LOCKED_ACCOUNT_DETAILS.bodyAr : LOCKED_ACCOUNT_DETAILS.body;
+
           this.emailProv
             .sendEmail({
               to: user.email,
-              subject:
-                lang === 'ar'
-                  ? 'تنبيه أمني: تم قفل الحساب مؤقتاً'
-                  : 'Security Notice: Account Temporarily Locked',
-              html: `<p>${lang === 'ar' ? LOCKED_ACCOUNT_DETAILS.bodyAr : LOCKED_ACCOUNT_DETAILS.body}</p>`,
+              subject: lockoutSubject,
+              html: buildBrandEmailHtml({
+                title: lockoutTitle,
+                preheader: lockoutSubject,
+                contentHtml: `<p>${lockoutBody}</p>`,
+                footnote: 'IBDL Freelancer Hub Security Team',
+              }),
             })
             .catch(async (err) => {
               console.warn('[SecurityNoticeEmail Error]', err);
@@ -219,6 +232,7 @@ export class LoginUseCase {
 
     return {
       sessionToken: rawToken,
+      sessionTimeoutMinutes: secConfig?.sessionTimeoutMinutes ?? 1440,
       user: {
         id: user.id,
         email: user.email,

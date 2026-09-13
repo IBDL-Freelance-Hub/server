@@ -16,6 +16,7 @@ const controller = new AuthController();
 router.get('/me', requireAuth, controller.me);
 
 router.get('/sessions', requireAuth, controller.getActiveSessions);
+router.delete('/sessions', requireAuth, controller.revokeOtherSessions);
 router.delete('/sessions/:sessionId', requireAuth, controller.revokeSession);
 
 router.post('/activate', validateRequest({ body: activateAccountSchema }), controller.activate);

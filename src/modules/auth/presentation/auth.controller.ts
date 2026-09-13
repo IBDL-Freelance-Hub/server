@@ -8,6 +8,10 @@ import { ResetPasswordUseCase } from '../application/reset-password.usecase';
 import { ChangePasswordUseCase } from '../application/change-password.usecase';
 import { GetActiveSessionsUseCase } from '../application/get-active-sessions.usecase';
 import { RevokeSessionUseCase } from '../application/revoke-session.usecase';
+import {
+  SessionService,
+  sessionService as defaultSessionService,
+} from '../infrastructure/session.service';
 import { AuthenticationError, ValidationError } from '../../../shared/errors';
 import { getClientIp } from '../../../shared/utils';
 
@@ -22,6 +26,7 @@ export class AuthController {
     private changePasswordUseCase = new ChangePasswordUseCase(),
     private getActiveSessionsUseCase = new GetActiveSessionsUseCase(),
     private revokeSessionUseCase = new RevokeSessionUseCase(),
+    private sessionSvc: SessionService = defaultSessionService,
   ) {}
 
   activate = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
@@ -71,6 +76,7 @@ export class AuthController {
         success: true,
         data: {
           sessionToken: result.sessionToken,
+          sessionTimeoutMinutes: result.sessionTimeoutMinutes,
           user: result.user,
         },
       });
@@ -194,6 +200,27 @@ export class AuthController {
       res.status(200).json({
         success: true,
         message: 'Session revoked successfully',
+      });
+    } catch (err) {
+      next(err);
+    }
+  };
+
+  revokeOtherSessions = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+    try {
+      if (!req.user) {
+        throw new AuthenticationError('Your session has ended. Please sign in again.');
+      }
+
+      await this.sessionSvc.revokeOtherUserSessions(
+        req.user.id,
+        req.user.sessionId || '',
+        'Revoked all other sessions by user',
+      );
+
+      res.status(200).json({
+        success: true,
+        message: 'All other sessions revoked successfully',
       });
     } catch (err) {
       next(err);
