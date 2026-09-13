@@ -112,23 +112,37 @@ export class SessionService {
   }
 
   /**
-   * Revokes a single session by marking revokedAt timestamp.
+   * Revokes a session by deleting the row from the Session table and inserting an AuditLog entry with action "SESSION_ENDED".
    */
-  async revokeSession(rawToken: string, reason = 'User Logout'): Promise<void> {
+  async revokeSession(
+    rawToken: string,
+    reason = 'User Logout',
+    ipAddress?: string,
+    requestId?: string,
+  ): Promise<void> {
     const tokenHash = this.hashToken(rawToken);
 
     const session = await this.prisma.session.findUnique({
       where: { tokenHash },
     });
 
-    if (session && !session.revokedAt) {
-      await this.prisma.session.update({
-        where: { id: session.id },
-        data: {
-          revokedAt: new Date(),
-          revokedReason: reason,
-        },
-      });
+    if (session) {
+      await this.prisma.$transaction([
+        this.prisma.session.delete({
+          where: { id: session.id },
+        }),
+        this.prisma.auditLog.create({
+          data: {
+            actorId: session.userId,
+            action: 'SESSION_ENDED',
+            resource: 'Session',
+            resourceId: session.id,
+            reason,
+            ipAddress: ipAddress || session.ipAddress || null,
+            requestId: requestId || null,
+          },
+        }),
+      ]);
     }
   }
 
