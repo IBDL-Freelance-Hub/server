@@ -58,3 +58,34 @@ export class TooManyRequestsError extends AppError {
 }
 
 export class RateLimitError extends TooManyRequestsError {}
+
+export class AccountLockedError extends AppError {
+  public readonly title: string;
+  public readonly body: string;
+
+  constructor(lang: 'ar' | 'en' = 'en') {
+    const title = lang === 'ar' ? 'تم قفل الحساب مؤقتاً' : 'Account temporarily locked';
+    const body =
+      lang === 'ar'
+        ? 'تم قفل حسابك مؤقتاً بعد عدة محاولات دخول غير ناجحة. لاستعادة الوصول، يرجى استخدام خيار نسيت كلمة المرور لإعادة تعيينها. إذا استمرت المشكلة، يرجى التواصل مع دعم Freelancers Hub.'
+        : 'Your account has been temporarily locked after multiple unsuccessful login attempts. To regain access, please use Forgot Password to reset your password. If you continue to have trouble accessing your account, please contact Freelancers Hub Support.';
+
+    const localizedAlt =
+      lang === 'en'
+        ? {
+            titleAr: 'تم قفل الحساب مؤقتاً',
+            bodyAr:
+              'تم قفل حسابك مؤقتاً بعد عدة محاولات دخول غير ناجحة. لاستعادة الوصول، يرجى استخدام خيار نسيت كلمة المرور لإعادة تعيينها. إذا استمرت المشكلة، يرجى التواصل مع دعم Freelancers Hub.',
+          }
+        : {
+            titleEn: 'Account temporarily locked',
+            bodyEn:
+              'Your account has been temporarily locked after multiple unsuccessful login attempts. To regain access, please use Forgot Password to reset your password. If you continue to have trouble accessing your account, please contact Freelancers Hub Support.',
+          };
+
+    super(body, 423, 'ACCOUNT_LOCKED', localizedAlt);
+
+    this.title = title;
+    this.body = body;
+  }
+}
