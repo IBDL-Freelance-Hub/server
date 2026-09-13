@@ -1,7 +1,9 @@
 import { Request, Response, NextFunction } from 'express';
+import { ParamsDictionary } from 'express-serve-static-core';
 import { RegisterMemberUseCase } from '../application/register-member.usecase';
 import { CheckDuplicateRegistrationUseCase } from '../application/check-duplicate-registration.usecase';
 import { RegisterMemberInput, CheckDuplicateInput } from './members.schema';
+import { getClientIp } from '../../../shared/utils';
 
 export class MembersController {
   constructor(
@@ -10,14 +12,15 @@ export class MembersController {
   ) {}
 
   register = async (
-    req: Request<unknown, unknown, RegisterMemberInput>,
+    req: Request<ParamsDictionary, unknown, RegisterMemberInput>,
     res: Response,
     next: NextFunction,
   ): Promise<void> => {
     try {
+      const clientIp = getClientIp(req);
       const result = await this.registerMemberUseCase.execute(req.body, {
         requestId: req.id,
-        ipAddress: req.ip,
+        ipAddress: clientIp,
       });
 
       res.status(201).json({
@@ -30,12 +33,13 @@ export class MembersController {
   };
 
   checkDuplicate = async (
-    req: Request<unknown, unknown, CheckDuplicateInput>,
+    req: Request<ParamsDictionary, unknown, CheckDuplicateInput>,
     res: Response,
     next: NextFunction,
   ): Promise<void> => {
     try {
-      const result = await this.checkDuplicateUseCase.execute(req.body, req.ip);
+      const clientIp = getClientIp(req);
+      const result = await this.checkDuplicateUseCase.execute(req.body, clientIp);
 
       res.status(200).json({
         success: true,
