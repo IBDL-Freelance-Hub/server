@@ -38,13 +38,26 @@ export class ResendEmailProvider implements IEmailProvider {
     }
 
     const fromAddress = process.env.EMAIL_FROM || 'IBDL Freelancer Hub <onboarding@resend.dev>';
+    const isSandbox = fromAddress.includes('resend.dev');
+
+    let emailSubject = subject;
+    const emailHtml = html;
+
+    // Resend sandbox mode only allows sending to the account owner (ashrafmarwa987@gmail.com)
+    if (isSandbox && targetEmail.toLowerCase() !== 'ashrafmarwa987@gmail.com') {
+      console.warn(
+        `[EmailProvider Resend Sandbox] Redirecting email intended for '${to}' to verified account 'ashrafmarwa987@gmail.com' to ensure successful delivery.`,
+      );
+      emailSubject = `[Test Mode - For ${to}] ${subject}`;
+      targetEmail = 'ashrafmarwa987@gmail.com';
+    }
 
     try {
       const response = await this.resendClient.emails.send({
         from: fromAddress,
         to: targetEmail,
-        subject,
-        html,
+        subject: emailSubject,
+        html: emailHtml,
       });
 
       if (response.error) {
