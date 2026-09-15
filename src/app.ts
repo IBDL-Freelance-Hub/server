@@ -20,7 +20,7 @@ const app: Express = express();
 // 1. Request ID Generation Middleware
 app.use(requestIdMiddleware);
 
-// 2. HTTP Security Headers (Safe defaults for local dev, Swagger UI & cross-origin assets)
+// 2. HTTP Security Headers (Safe defaults for local dev, Swagger UI CDN & cross-origin assets)
 app.use(
   helmet({
     crossOriginResourcePolicy: { policy: 'cross-origin' },
@@ -28,8 +28,13 @@ app.use(
       directives: {
         ...helmet.contentSecurityPolicy.getDefaultDirectives(),
         'img-src': ["'self'", 'data:', 'https:'],
-        'script-src': ["'self'", "'unsafe-inline'", "'unsafe-eval'"],
-        'style-src': ["'self'", "'unsafe-inline'"],
+        'script-src': [
+          "'self'",
+          "'unsafe-inline'",
+          "'unsafe-eval'",
+          'https://cdnjs.cloudflare.com',
+        ],
+        'style-src': ["'self'", "'unsafe-inline'", 'https://cdnjs.cloudflare.com'],
       },
     },
   }),
@@ -74,18 +79,33 @@ app.get('/api-docs.json', (_req: Request, res: Response) => {
   res.send(swaggerSpec);
 });
 
-app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec));
+// CDN Assets for Swagger UI in Serverless Environments (Vercel)
+const SWAGGER_CSS_URL =
+  'https://cdnjs.cloudflare.com/ajax/libs/swagger-ui/5.11.8/swagger-ui.min.css';
+const SWAGGER_JS_URLS = [
+  'https://cdnjs.cloudflare.com/ajax/libs/swagger-ui/5.11.8/swagger-ui-bundle.min.js',
+  'https://cdnjs.cloudflare.com/ajax/libs/swagger-ui/5.11.8/swagger-ui-standalone-preset.min.js',
+];
+
+app.use(
+  '/api-docs',
+  swaggerUi.serve,
+  swaggerUi.setup(swaggerSpec, {
+    customCssUrl: SWAGGER_CSS_URL,
+    customJs: SWAGGER_JS_URLS,
+  }),
+);
 
 // 10. API Module Routes
 app.use('/api/v1/members', membersRouter);
 app.use('/api/v1/auth', authRouter);
 
-// 10. Catch-All 404 Route Handler
+// 11. Catch-All 404 Route Handler
 app.use((req: Request, _res: Response, next: NextFunction) => {
   next(new NotFoundError(`Route ${req.method} ${req.originalUrl} not found`));
 });
 
-// 11. Global Error Handler (Must be registered last)
+// 12. Global Error Handler (Must be registered last)
 app.use(errorHandlerMiddleware);
 
 export default app;
