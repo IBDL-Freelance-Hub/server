@@ -37,6 +37,7 @@ export const requireAuth = async (
       staffRole: user.staff?.role || null,
       memberId: user.member?.id || null,
       sessionId: session.id,
+      member: user.member || null,
     };
 
     next();

@@ -99,7 +99,12 @@ export class RegisterMemberUseCase {
     });
 
     const tempPasswordHash = '$2b$10$UNSET_PASSWORD_HASH_' + crypto.randomBytes(16).toString('hex');
+    const config = await this.prisma.securityConfig.findFirst({ where: { id: 1 } });
+    const lifetimeMinutes = config?.activationLinkLifetimeMinutes ?? 10;
+    const rawToken = crypto.randomBytes(32).toString('hex');
+    const tokenHash = crypto.createHash('sha256').update(rawToken).digest('hex');
     const startDate = new Date();
+    const expiresAt = new Date(startDate.getTime() + lifetimeMinutes * 60 * 1000);
     const endDate = new Date(startDate);
     endDate.setFullYear(endDate.getFullYear() + 1);
 
@@ -112,7 +117,16 @@ export class RegisterMemberUseCase {
             emailNormalized,
             passwordHash: tempPasswordHash,
             userType: 'MEMBER',
-            status: 'ACTIVE',
+            status: 'UNACTIVATED',
+          },
+        });
+
+        await tx.verificationToken.create({
+          data: {
+            userId: createdUser.id,
+            purpose: 'ACTIVATION',
+            tokenHash,
+            expiresAt,
           },
         });
 
@@ -207,7 +221,7 @@ export class RegisterMemberUseCase {
     const logoUrl =
       process.env.PUBLIC_LOGO_URL ||
       (isLocal ? 'https://ibdl.net/site/images/logo.png' : `${clientUrl}/Logos/IBDL.png`);
-    const loginUrl = `${clientUrl}/login`;
+    const activationUrl = `${clientUrl}/activate?token=${rawToken}`;
     const pqpLink = claimedCredential.accessUrl.startsWith('http')
       ? claimedCredential.accessUrl
       : `https://${claimedCredential.accessUrl}`;
@@ -286,14 +300,18 @@ export class RegisterMemberUseCase {
             <table role="presentation" cellpadding="0" cellspacing="0">
               <tr>
                 <td align="center" style="background-color:#E11119; border-radius:28px;">
-                  <a href="${loginUrl}" style="display:inline-block; padding:14px 32px; color:#FFFFFF; font-size:15px; font-weight:bold; text-decoration:none;">
-                    Log In to Your Account →
+                  <a href="${activationUrl}" style="display:inline-block; padding:14px 32px; color:#FFFFFF; font-size:15px; font-weight:bold; text-decoration:none;">
+                    Activate Account &amp; Set Password →
                   </a>
                 </td>
               </tr>
             </table>
+            <p style="color:#6B6B76; font-size:12px; margin-top:12px; text-align:center;">
+              This activation link is valid for 10 minutes. If expired, request a new one at <a href="${clientUrl}/activate" style="color:#E11119;">${clientUrl}/activate</a>.
+            </p>
           </td>
         </tr>
+
 
         <!-- ===== SECTION DIVIDER ===== -->
         <tr>

@@ -1,3 +1,5 @@
+import { PrismaClient } from '@prisma/client';
+import { prisma as defaultPrisma } from '../../../shared/providers';
 import { Request, Response, NextFunction } from 'express';
 import { ActivateAccountUseCase } from '../application/activate-account.usecase';
 import { ResendActivationLinkUseCase } from '../application/resend-activation-link.usecase';
@@ -12,7 +14,7 @@ import {
   SessionService,
   sessionService as defaultSessionService,
 } from '../infrastructure/session.service';
-import { AuthenticationError, ValidationError } from '../../../shared/errors';
+import { AuthenticationError, NotFoundError, ValidationError } from '../../../shared/errors';
 import { getClientIp } from '../../../shared/utils';
 
 export class AuthController {
@@ -27,6 +29,7 @@ export class AuthController {
     private getActiveSessionsUseCase = new GetActiveSessionsUseCase(),
     private revokeSessionUseCase = new RevokeSessionUseCase(),
     private sessionSvc: SessionService = defaultSessionService,
+    private prisma: PrismaClient = defaultPrisma,
   ) {}
 
   activate = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
@@ -233,10 +236,56 @@ export class AuthController {
         throw new AuthenticationError('Your session has ended. Please sign in again.');
       }
 
+      const member = await this.prisma.member.findUnique({
+        where: { userId: req.user.id },
+        include: {
+          memberships: {
+            where: { status: 'ACTIVE' },
+            orderBy: { createdAt: 'desc' },
+            take: 1,
+          },
+        },
+      });
+
+      if (!member) {
+        throw new NotFoundError('Member profile not found');
+      }
+
+      const activeMembership = member.memberships[0] || null;
+
       res.status(200).json({
         success: true,
         data: {
-          user: req.user,
+          user: {
+            id: req.user.id,
+            email: req.user.email,
+            status: req.user.status,
+          },
+          member: {
+            fullNameEn: member.fullNameEn,
+            fullNameAr: member.fullNameAr,
+            phone: member.phone,
+            country: member.country,
+            city: member.city,
+            yearsOfExperience: member.yearsOfExperience,
+            areasOfExpertise: member.areasOfExpertise,
+            industriesServed: member.industriesServed,
+            languages: member.languages,
+            bioEn: member.bioEn,
+            bioAr: member.bioAr,
+            linkedinUrl: member.linkedinUrl,
+            photoFileId: member.photoFileId,
+            directoryOptIn: member.directoryOptIn,
+            profileCompletionRate: member.profileCompletionRate,
+          },
+          membership: activeMembership
+            ? {
+                tier: activeMembership.tier,
+                status: activeMembership.status,
+                startDate: activeMembership.startDate,
+                endDate: activeMembership.endDate,
+              }
+            : null,
         },
       });
     } catch (err) {

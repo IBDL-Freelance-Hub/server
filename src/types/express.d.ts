@@ -5,6 +5,7 @@ export interface RequestUser {
   status: 'ACTIVE' | 'UNACTIVATED' | 'SUSPENDED' | 'CLOSED';
   staffRole?: string | null;
   memberId?: string | null;
+  member?: Record<string, unknown> | null;
   sessionId?: string;
 }
 
