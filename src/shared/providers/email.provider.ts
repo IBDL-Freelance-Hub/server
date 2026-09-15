@@ -55,9 +55,9 @@ export class ResendEmailProvider implements IEmailProvider {
           (response.error as { statusCode?: number }).statusCode === 403 ||
           response.error.message?.includes('only send testing emails');
 
-        if (isResendRestriction && process.env.NODE_ENV === 'development') {
+        if (isResendRestriction) {
           console.warn(
-            `[EmailProvider Resend Sandbox Restriction] Email to '${to}' failed because Resend test mode only permits sending to your registered account (ashrafmarwa987@gmail.com).`,
+            `[EmailProvider Resend Sandbox Restriction] Email to '${to}' failed because Resend test mode only permits sending to registered account owners or verified domains.`,
           );
           return;
         }

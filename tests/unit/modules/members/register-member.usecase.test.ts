@@ -37,6 +37,9 @@ describe('RegisterMemberUseCase Unit Tests', () => {
       auditLog: {
         create: jest.fn(),
       },
+      securityConfig: {
+        findFirst: jest.fn().mockResolvedValue({ activationLinkLifetimeMinutes: 10 }),
+      },
       $transaction: jest.fn(),
     } as unknown as jest.Mocked<PrismaClient>;
 

@@ -105,22 +105,26 @@ export class ForgotPasswordUseCase {
       const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:3000';
       const resetLink = `${frontendUrl}/reset-password?token=${rawToken}`;
 
-      await this.emailSvc.sendEmail({
-        to: user.email,
-        subject: 'Reset Your IBDL Freelancer Hub Password',
-        html: buildBrandEmailHtml({
-          title: 'Password Reset Request',
-          preheader: 'We received a request to reset your IBDL Freelancer Hub password.',
-          contentHtml: `
-            <p>Hello,</p>
-            <p>We received a request to reset the password for your <strong>IBDL Freelancer Hub</strong> account.</p>
-            <p>Please click the button below to choose a new password:</p>
-          `,
-          ctaText: 'Reset Password',
-          ctaUrl: resetLink,
-          footnote: `This reset link will expire in <strong>${lifetimeMinutes} minutes</strong>. If you did not request a password reset, you can safely ignore this email.`,
-        }),
-      });
+      try {
+        await this.emailSvc.sendEmail({
+          to: user.email,
+          subject: 'Reset Your IBDL Freelancer Hub Password',
+          html: buildBrandEmailHtml({
+            title: 'Password Reset Request',
+            preheader: 'We received a request to reset your IBDL Freelancer Hub password.',
+            contentHtml: `
+              <p>Hello,</p>
+              <p>We received a request to reset the password for your <strong>IBDL Freelancer Hub</strong> account.</p>
+              <p>Please click the button below to choose a new password:</p>
+            `,
+            ctaText: 'Reset Password',
+            ctaUrl: resetLink,
+            footnote: `This reset link will expire in <strong>${lifetimeMinutes} minutes</strong>. If you did not request a password reset, you can safely ignore this email.`,
+          }),
+        });
+      } catch (err) {
+        console.warn('[ForgotPassword Email Failed]', err instanceof Error ? err.message : err);
+      }
     }
 
     return genericSuccessResponse;

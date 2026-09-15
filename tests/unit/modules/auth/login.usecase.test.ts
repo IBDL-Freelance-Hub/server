@@ -19,6 +19,9 @@ describe('LoginUseCase Unit Tests', () => {
       user: {
         findUnique: jest.fn(),
       },
+      securityConfig: {
+        findFirst: jest.fn().mockResolvedValue({ lockoutThreshold: 5, lockoutDurationMinutes: 30 }),
+      },
     } as unknown as jest.Mocked<PrismaClient>;
 
     mockHashProvider = {

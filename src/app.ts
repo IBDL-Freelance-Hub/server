@@ -78,7 +78,7 @@ app.get('/api-docs.json', (_req: Request, res: Response) => {
   res.send(swaggerSpec);
 });
 
-app.get(['/api-docs', '/api-docs/'], (_req: Request, res: Response) => {
+app.get(['/docs', '/docs/', '/api-docs', '/api-docs/'], (_req: Request, res: Response) => {
   res.setHeader('Content-Type', 'text/html');
   res.send(`
     <!DOCTYPE html>

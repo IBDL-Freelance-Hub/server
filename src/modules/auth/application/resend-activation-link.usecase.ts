@@ -115,21 +115,28 @@ export class ResendActivationLinkUseCase {
       const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:3000';
       const activationLink = `${frontendUrl}/activate?token=${rawToken}`;
 
-      await this.emailSvc.sendEmail({
-        to: user.email,
-        subject: 'Activate Your IBDL Freelancer Hub Account',
-        html: buildBrandEmailHtml({
-          title: 'Activate Your IBDL Freelancer Hub Account',
-          preheader: 'Please set up your password to activate your Freelancers Hub membership.',
-          contentHtml: `
-            <p>Hello,</p>
-            <p>Welcome to <strong>IBDL Freelancers Hub</strong>! Please click the button below to set up your password and complete your account activation:</p>
-          `,
-          ctaText: 'Activate Account',
-          ctaUrl: activationLink,
-          footnote: `This activation link will expire in <strong>10 minutes</strong>. If you did not request this link, you can safely ignore this email.`,
-        }),
-      });
+      try {
+        await this.emailSvc.sendEmail({
+          to: user.email,
+          subject: 'Activate Your IBDL Freelancer Hub Account',
+          html: buildBrandEmailHtml({
+            title: 'Activate Your IBDL Freelancer Hub Account',
+            preheader: 'Please set up your password to activate your Freelancers Hub membership.',
+            contentHtml: `
+              <p>Hello,</p>
+              <p>Welcome to <strong>IBDL Freelancers Hub</strong>! Please click the button below to set up your password and complete your account activation:</p>
+            `,
+            ctaText: 'Activate Account',
+            ctaUrl: activationLink,
+            footnote: `This activation link will expire in <strong>10 minutes</strong>. If you did not request this link, you can safely ignore this email.`,
+          }),
+        });
+      } catch (err) {
+        console.warn(
+          '[ResendActivationLink Email Failed]',
+          err instanceof Error ? err.message : err,
+        );
+      }
     }
 
     return genericSuccessResponse;

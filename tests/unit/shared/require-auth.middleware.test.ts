@@ -64,6 +64,7 @@ describe('requireAuth Middleware Unit Tests', () => {
       status: 'ACTIVE',
       staffRole: null,
       memberId: 'member-456',
+      member: { id: 'member-456' },
       sessionId: 's-1',
     });
     expect(next).toHaveBeenCalledWith();
