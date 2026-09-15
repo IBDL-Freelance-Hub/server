@@ -2,7 +2,6 @@ import express, { Express, Request, Response, NextFunction } from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
 import cookieParser from 'cookie-parser';
-import swaggerUi from 'swagger-ui-express';
 import { env } from './config/env.config';
 import { swaggerSpec } from './config/swagger.config';
 import {
@@ -73,28 +72,52 @@ app.get('/health', (_req: Request, res: Response) => {
   });
 });
 
-// 9. Swagger API Documentation Endpoints
+// 9. Swagger API Documentation Endpoints (Standalone HTML for Serverless Vercel Compatibility)
 app.get('/api-docs.json', (_req: Request, res: Response) => {
   res.setHeader('Content-Type', 'application/json');
   res.send(swaggerSpec);
 });
 
-// CDN Assets for Swagger UI in Serverless Environments (Vercel)
-const SWAGGER_CSS_URL =
-  'https://cdnjs.cloudflare.com/ajax/libs/swagger-ui/5.11.8/swagger-ui.min.css';
-const SWAGGER_JS_URLS = [
-  'https://cdnjs.cloudflare.com/ajax/libs/swagger-ui/5.11.8/swagger-ui-bundle.min.js',
-  'https://cdnjs.cloudflare.com/ajax/libs/swagger-ui/5.11.8/swagger-ui-standalone-preset.min.js',
-];
-
-app.use(
-  '/api-docs',
-  swaggerUi.serve,
-  swaggerUi.setup(swaggerSpec, {
-    customCssUrl: SWAGGER_CSS_URL,
-    customJs: SWAGGER_JS_URLS,
-  }),
-);
+app.get('/api-docs', (_req: Request, res: Response) => {
+  res.setHeader('Content-Type', 'text/html');
+  res.send(`
+    <!DOCTYPE html>
+    <html lang="en">
+    <head>
+      <meta charset="UTF-8">
+      <title>IBDL Freelancers Hub API Documentation</title>
+      <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/swagger-ui/5.11.8/swagger-ui.min.css" />
+      <style>
+        html { box-sizing: border-box; overflow-y: scroll; }
+        *, *:before, *:after { box-sizing: inherit; }
+        body { margin: 0; background: #fafafa; }
+      </style>
+    </head>
+    <body>
+      <div id="swagger-ui"></div>
+      <script src="https://cdnjs.cloudflare.com/ajax/libs/swagger-ui/5.11.8/swagger-ui-bundle.min.js"></script>
+      <script src="https://cdnjs.cloudflare.com/ajax/libs/swagger-ui/5.11.8/swagger-ui-standalone-preset.min.js"></script>
+      <script>
+        window.onload = function() {
+          window.ui = SwaggerUIBundle({
+            url: "/api-docs.json",
+            dom_id: '#swagger-ui',
+            deepLinking: true,
+            presets: [
+              SwaggerUIBundle.presets.apis,
+              SwaggerUIStandalonePreset
+            ],
+            plugins: [
+              SwaggerUIBundle.plugins.DownloadUrl
+            ],
+            layout: "StandaloneLayout"
+          });
+        };
+      </script>
+    </body>
+    </html>
+  `);
+});
 
 // 10. API Module Routes
 app.use('/api/v1/members', membersRouter);
