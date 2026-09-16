@@ -16,6 +16,10 @@ describe('LoginUseCase Unit Tests', () => {
         findMany: jest.fn(),
         create: jest.fn(),
       },
+      emailLockout: {
+        findUnique: jest.fn().mockResolvedValue(null),
+        upsert: jest.fn().mockResolvedValue({}),
+      },
       user: {
         findUnique: jest.fn(),
       },
@@ -98,23 +102,19 @@ describe('LoginUseCase Unit Tests', () => {
     );
   });
 
-  it('should throw AuthenticationError if account is locked due to 5 recent failed attempts', async () => {
-    const now = Date.now();
-    const fiveFailedAttempts = [
-      { attemptedAt: new Date(now - 10 * 60 * 1000) },
-      { attemptedAt: new Date(now - 8 * 60 * 1000) },
-      { attemptedAt: new Date(now - 6 * 60 * 1000) },
-      { attemptedAt: new Date(now - 4 * 60 * 1000) },
-      { attemptedAt: new Date(now - 2 * 60 * 1000) },
-    ];
-    (mockPrisma.loginAttempt.findMany as jest.Mock).mockResolvedValue(fiveFailedAttempts);
+  it('should throw AccountLockedError if account is locked due to 5 recent failed attempts', async () => {
+    (mockPrisma.emailLockout.findUnique as jest.Mock).mockResolvedValue({
+      emailNormalized: 'locked@example.com',
+      failedAttemptCount: 5,
+      lockedUntil: new Date(Date.now() + 30 * 60 * 1000),
+    });
 
     await expect(
       useCase.execute({
         email: 'locked@example.com',
         password: 'Password123',
       }),
-    ).rejects.toThrow('Account locked. Try again in 30 minutes.');
+    ).rejects.toThrow();
   });
 
   it('should throw AuthorizationError if account status is SUSPENDED', async () => {

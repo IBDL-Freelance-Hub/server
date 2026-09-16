@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import {
   LoginUseCase,
   LOCKED_ACCOUNT_DETAILS,
@@ -50,10 +51,10 @@ describe('Decoupled EmailLockout & Login Failure UX Protocol', () => {
     string,
     { emailNormalized: string; failedAttemptCount: number; lockedUntil: Date | null }
   >;
-  let mockPrisma: Record<string, unknown>;
-  let mockHashProv: Record<string, unknown>;
-  let mockSessionSvc: Record<string, unknown>;
-  let mockEmailProv: Record<string, unknown>;
+  let mockPrisma: any;
+  let mockHashProv: any;
+  let mockSessionSvc: any;
+  let mockEmailProv: any;
 
   beforeEach(() => {
     lockoutStore = new Map();

@@ -5,7 +5,7 @@ import {
   emailProvider as defaultEmailProvider,
   IEmailProvider,
 } from '../../../shared/providers';
-import { normalizeEmail } from '../../../shared/utils';
+import { normalizeEmail, getFrontendBaseUrl } from '../../../shared/utils';
 import {
   TokenRateLimiterService,
   tokenRateLimiterService as defaultRateLimiter,
@@ -112,7 +112,7 @@ export class ResendActivationLinkUseCase {
         });
       });
 
-      const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:3000';
+      const frontendUrl = getFrontendBaseUrl();
       const activationLink = `${frontendUrl}/activate?token=${rawToken}`;
 
       try {

@@ -15,6 +15,8 @@ export function buildBrandEmailHtml({
   ctaUrl,
   footnote,
 }: BaseEmailTemplateOptions): string {
+  const logoUrl = process.env.PUBLIC_LOGO_URL || 'https://ibdl.net/site/images/logo.png';
+
   return `<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -30,18 +32,19 @@ export function buildBrandEmailHtml({
       <td align="center">
         <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width: 600px; background-color: #FFFFFF; border-radius: 16px; overflow: hidden; box-shadow: 0 10px 30px rgba(0, 0, 0, 0.05); border: 1px solid #E2E2EC;">
           
-          <!-- BRAND HEADER -->
+          <!-- BRAND HEADER WITH OFFICIAL CIRCULAR LOGO BADGE -->
           <tr>
-            <td align="center" style="background: #141428; padding: 32px 24px; border-bottom: 4px solid #E11119;">
+            <td align="center" style="background-color: #1D1D39; padding: 36px 24px;">
               <table role="presentation" cellpadding="0" cellspacing="0">
                 <tr>
-                  <td align="center">
-                    <span style="color: #FFFFFF; font-size: 20px; font-weight: 800; letter-spacing: 1px; font-family: Arial, sans-serif; text-transform: uppercase;">
-                      IBDL <span style="color: #E11119;">FREELANCERS HUB</span>
-                    </span>
+                  <td align="center" style="background-color: #FFFFFF; border-radius: 50%; width: 84px; height: 84px;">
+                    <img src="${logoUrl}" width="52" height="52" alt="IBDL Logo" style="display: block; margin: 16px auto; object-fit: contain;" />
                   </td>
                 </tr>
               </table>
+              <div style="color: #FFFFFF; font-size: 13px; letter-spacing: 1px; margin-top: 14px; opacity: 0.75; font-family: Arial, sans-serif; text-transform: uppercase;">
+                FREELANCERS HUB &nbsp;|&nbsp; POWERED BY IBDL
+              </div>
             </td>
           </tr>
 

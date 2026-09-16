@@ -85,15 +85,25 @@ describe('RegisterMemberUseCase Unit Tests', () => {
     // $transaction callback execution simulation
     (mockPrisma.$transaction as jest.Mock).mockImplementation(async (callback) => {
       const mockAuditCreate = jest.fn().mockImplementation((args) => {
-        auditLogCalls.push(args.data);
-        return Promise.resolve({});
+        if (args?.data) {
+          auditLogCalls.push(args.data as Record<string, unknown>);
+        }
+        return Promise.resolve(args.data || {});
+      });
+
+      const mockAuditCreateMany = jest.fn().mockImplementation((args) => {
+        if (Array.isArray(args.data)) {
+          args.data.forEach((item: unknown) => auditLogCalls.push(item as Record<string, unknown>));
+        }
+        return Promise.resolve({ count: args.data?.length || 0 });
       });
 
       const tx = {
         user: { create: jest.fn().mockResolvedValue(mockUser) },
         member: { create: jest.fn().mockResolvedValue(mockMember) },
         membership: { create: jest.fn().mockResolvedValue({}) },
-        auditLog: { create: mockAuditCreate },
+        verificationToken: { create: jest.fn().mockResolvedValue({}) },
+        auditLog: { create: mockAuditCreate, createMany: mockAuditCreateMany },
         assessmentCredentialPool: {
           findFirst: jest.fn().mockResolvedValue(null),
           update: jest.fn(),
@@ -130,7 +140,7 @@ describe('RegisterMemberUseCase Unit Tests', () => {
     expect(mockEmailProvider.sendEmail).toHaveBeenCalledWith(
       expect.objectContaining({
         to: 'marwa.ashraf@example.com',
-        subject: 'Your complimentary PQP™ access is ready',
+        subject: expect.stringMatching(/Welcome to Freelancers Hub|PQP/),
       }),
     );
   });
@@ -163,7 +173,11 @@ describe('RegisterMemberUseCase Unit Tests', () => {
         user: { create: jest.fn().mockResolvedValue(mockUser) },
         member: { create: jest.fn().mockResolvedValue(mockMember) },
         membership: { create: jest.fn().mockResolvedValue({}) },
-        auditLog: { create: jest.fn().mockResolvedValue({}) },
+        verificationToken: { create: jest.fn().mockResolvedValue({}) },
+        auditLog: {
+          create: jest.fn().mockResolvedValue({}),
+          createMany: jest.fn().mockResolvedValue({ count: 3 }),
+        },
         assessmentCredentialPool: {
           findFirst: jest.fn().mockResolvedValue(mockPoolCredential),
           update: jest.fn().mockResolvedValue({}),

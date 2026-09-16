@@ -6,11 +6,10 @@ import {
   IEmailProvider,
 } from '../../../shared/providers';
 import { ConflictError, ValidationError } from '../../../shared/errors';
-import { normalizeEmail } from '../../../shared/utils';
+import { normalizeEmail, getFrontendBaseUrl } from '../../../shared/utils';
 import { normalizePhoneNumber, calculateProfileCompletion } from '../domain';
 import { RegisterMemberInput } from '../presentation/members.schema';
 import { claimAssessmentCredential } from '../infrastructure/assessment-pool.service';
-import { env } from '../../../config/env.config';
 
 export interface RegisterMemberContext {
   requestId?: string;
@@ -216,11 +215,8 @@ export class RegisterMemberUseCase {
       : 'Live pre-generated assessment voucher claimed from pool.';
 
     const firstName = member.fullNameEn.trim().split(/\s+/)[0] || member.fullNameEn.trim();
-    const clientUrl = env.CORS_ORIGIN || 'https://freelancers.ibdl.net';
-    const isLocal = clientUrl.includes('localhost') || clientUrl.includes('127.0.0.1');
-    const logoUrl =
-      process.env.PUBLIC_LOGO_URL ||
-      (isLocal ? 'https://ibdl.net/site/images/logo.png' : `${clientUrl}/Logos/IBDL.png`);
+    const clientUrl = getFrontendBaseUrl();
+    const logoUrl = process.env.PUBLIC_LOGO_URL || 'https://ibdl.net/site/images/logo.png';
     const activationUrl = `${clientUrl}/activate?token=${rawToken}`;
     const pqpLink = claimedCredential.accessUrl.startsWith('http')
       ? claimedCredential.accessUrl

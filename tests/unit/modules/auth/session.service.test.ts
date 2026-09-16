@@ -17,8 +17,13 @@ describe('SessionService Unit Tests', () => {
         findMany: jest.fn(),
         update: jest.fn(),
         updateMany: jest.fn(),
+        delete: jest.fn(),
         deleteMany: jest.fn(),
       },
+      auditLog: {
+        create: jest.fn(),
+      },
+      $transaction: jest.fn().mockImplementation((promises) => Promise.all(promises)),
     } as unknown as jest.Mocked<PrismaClient>;
 
     sessionService = new SessionService(mockPrisma);
@@ -168,20 +173,13 @@ describe('SessionService Unit Tests', () => {
     };
 
     (mockPrisma.session.findUnique as jest.Mock).mockResolvedValue(mockSession);
-    (mockPrisma.session.update as jest.Mock).mockResolvedValue({
-      ...mockSession,
-      revokedAt: new Date(),
-      revokedReason: 'User Logout',
-    });
+    (mockPrisma.$transaction as jest.Mock).mockResolvedValue([mockSession, {}]);
 
     await sessionService.revokeSession('raw-token', 'User Logout');
 
-    expect(mockPrisma.session.update).toHaveBeenCalledWith(
+    expect(mockPrisma.session.delete).toHaveBeenCalledWith(
       expect.objectContaining({
         where: { id: 'session-1' },
-        data: expect.objectContaining({
-          revokedReason: 'User Logout',
-        }),
       }),
     );
   });
