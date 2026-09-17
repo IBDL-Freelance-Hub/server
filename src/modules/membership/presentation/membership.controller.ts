@@ -1,6 +1,7 @@
 import { Request, Response, NextFunction } from 'express';
 import { ParamsDictionary } from 'express-serve-static-core';
 import { UpgradeMembershipUseCase } from '../application/upgrade-membership.usecase';
+import { GetMembershipTiersUseCase } from '../application/get-membership-tiers.usecase';
 import { UpgradeMembershipInput } from './membership.schema';
 import { AuthenticationError } from '../../../shared/errors';
 import { getClientIp } from '../../../shared/utils';
@@ -8,7 +9,20 @@ import { getClientIp } from '../../../shared/utils';
 export class MembershipController {
   constructor(
     private readonly upgradeMembershipUseCase: UpgradeMembershipUseCase = new UpgradeMembershipUseCase(),
+    private readonly getMembershipTiersUseCase: GetMembershipTiersUseCase = new GetMembershipTiersUseCase(),
   ) {}
+
+  getTiers = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+    try {
+      const tiers = await this.getMembershipTiersUseCase.execute(req.user?.id);
+      res.status(200).json({
+        success: true,
+        data: tiers,
+      });
+    } catch (error) {
+      next(error);
+    }
+  };
 
   upgrade = async (
     req: Request<ParamsDictionary, unknown, UpgradeMembershipInput>,

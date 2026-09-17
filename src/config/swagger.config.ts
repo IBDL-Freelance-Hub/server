@@ -262,6 +262,39 @@ const options: swaggerJsdoc.Options = {
             },
           },
         },
+        MembershipTierCatalogItem: {
+          type: 'object',
+          properties: {
+            tier: {
+              type: 'string',
+              enum: ['ESSENTIAL', 'PROFESSIONAL', 'MASTER'],
+              example: 'PROFESSIONAL',
+            },
+            name: { type: 'string', example: 'Professional' },
+            tagline: {
+              type: 'string',
+              example: 'The Hub working alongside your practice, at the member rate.',
+            },
+            annualFee: { type: 'number', example: 180.0 },
+            currency: { type: 'string', example: 'USD' },
+            discountRate: { type: 'integer', example: 30 },
+            coreHubServicesIncluded: { type: 'boolean', example: false },
+            accreditedProgrammes: { type: 'integer', example: 1 },
+            freeTraineeCertificates: { type: 'integer', example: 20 },
+            freeQuarterlyTools: { type: 'integer', example: 0 },
+            trainerCertificationEligible: { type: 'boolean', example: false },
+            coreHubServices: {
+              type: 'array',
+              items: { type: 'string' },
+              example: [
+                'Training Needs Analysis (TNA) Assistance',
+                'Program Mapping & Learning Architecture',
+              ],
+            },
+            isCurrentPlan: { type: 'boolean', example: false },
+            canUpgrade: { type: 'boolean', example: true },
+          },
+        },
         LoginRequest: {
           type: 'object',
           required: ['email', 'password'],
@@ -500,6 +533,33 @@ const options: swaggerJsdoc.Options = {
             },
             '409': {
               description: 'Mobile number clash with another member',
+            },
+          },
+        },
+      },
+      '/api/v1/memberships/tiers': {
+        get: {
+          summary: 'List Membership Tiers Catalog',
+          description:
+            'Retrieves canonical tier metadata, pricing, discounts, and benefits for comparison (SCR-68) and upgrade flows (SCR-70). Returns session-aware flags (isCurrentPlan, canUpgrade) if authenticated.',
+          tags: ['Membership'],
+          responses: {
+            '200': {
+              description: 'Membership tiers catalog retrieved successfully',
+              content: {
+                'application/json': {
+                  schema: {
+                    type: 'object',
+                    properties: {
+                      success: { type: 'boolean', example: true },
+                      data: {
+                        type: 'array',
+                        items: { $ref: '#/components/schemas/MembershipTierCatalogItem' },
+                      },
+                    },
+                  },
+                },
+              },
             },
           },
         },
