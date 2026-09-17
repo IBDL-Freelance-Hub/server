@@ -277,7 +277,7 @@ export function calculateEntitlements(
   }
 }
 
-function getTierDisplayName(tier: MembershipTier): string {
+export function getTierDisplayName(tier: MembershipTier): string {
   switch (tier) {
     case MembershipTier.MASTER:
       return 'Master';
@@ -288,3 +288,77 @@ function getTierDisplayName(tier: MembershipTier): string {
       return 'Essential';
   }
 }
+
+/**
+ * The 12 Canonical Core Hub Services offered by IBDL Freelancer Hub (Spec v5.0, SCR-68).
+ */
+export const CORE_HUB_SERVICES: readonly string[] = [
+  'Training Needs Analysis (TNA) Assistance',
+  'Program Mapping & Learning Architecture',
+  'Proposal Building & Commercial Solution Support',
+  'Content Design & Development',
+  'Training Mode & Strategy Selection',
+  'Training ROI & Impact Measurement Toolkit',
+  'Trainer Help Desk & Expert Support',
+  'Professional Profile, Visibility & Opportunity Showcase',
+  'Business Networking & Collaboration',
+  'Accreditation & Professional Recognition Pathway',
+  'Templates, Tools & Resource Library',
+  'Continuous Professional Development & Market Insights',
+] as const;
+
+export interface TierCatalogDescriptor {
+  tier: MembershipTier;
+  name: string;
+  tagline: string;
+  annualFee: number;
+  currency: 'USD';
+  discountRate: number;
+  coreHubServicesIncluded: boolean;
+  accreditedProgrammes: number;
+  freeTraineeCertificates: number;
+  freeQuarterlyTools: number;
+  trainerCertificationEligible: boolean;
+}
+
+export const TIER_CATALOG_METADATA: Record<MembershipTier, TierCatalogDescriptor> = {
+  [MembershipTier.ESSENTIAL]: {
+    tier: MembershipTier.ESSENTIAL,
+    name: 'Essential',
+    tagline: 'Free permanently. Upgrade only when your practice is ready.',
+    annualFee: 0,
+    currency: 'USD',
+    discountRate: 15,
+    coreHubServicesIncluded: false,
+    accreditedProgrammes: 0,
+    freeTraineeCertificates: 0,
+    freeQuarterlyTools: 0,
+    trainerCertificationEligible: false,
+  },
+  [MembershipTier.PROFESSIONAL]: {
+    tier: MembershipTier.PROFESSIONAL,
+    name: 'Professional',
+    tagline: 'The Hub working alongside your practice, at the member rate.',
+    annualFee: 180,
+    currency: 'USD',
+    discountRate: 30,
+    coreHubServicesIncluded: false,
+    accreditedProgrammes: 1,
+    freeTraineeCertificates: 20,
+    freeQuarterlyTools: 0,
+    trainerCertificationEligible: false,
+  },
+  [MembershipTier.MASTER]: {
+    tier: MembershipTier.MASTER,
+    name: 'Master',
+    tagline: 'Every Core Hub Service included, plus the pathways to IBDL recognition.',
+    annualFee: 380,
+    currency: 'USD',
+    discountRate: 40,
+    coreHubServicesIncluded: true,
+    accreditedProgrammes: 2,
+    freeTraineeCertificates: 40,
+    freeQuarterlyTools: 4,
+    trainerCertificationEligible: true,
+  },
+};
