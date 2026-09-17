@@ -348,6 +348,82 @@ const options: swaggerJsdoc.Options = {
           },
         },
       },
+      '/api/v1/files/cv': {
+        post: {
+          summary: 'Upload Curriculum Vitae (CV)',
+          description:
+            'Uploads a member CV document (PDF, DOC, DOCX up to 25MB) with magic byte verification.',
+          tags: ['Files'],
+          security: [{ cookieAuth: [] }, { bearerAuth: [] }],
+          requestBody: {
+            required: true,
+            content: {
+              'multipart/form-data': {
+                schema: {
+                  type: 'object',
+                  properties: {
+                    file: { type: 'string', format: 'binary' },
+                  },
+                },
+              },
+            },
+          },
+          responses: {
+            '201': { description: 'CV uploaded successfully' },
+            '400': { description: 'Invalid file format or size exceeded' },
+            '401': { description: 'Unauthorized' },
+          },
+        },
+      },
+      '/api/v1/files/photo': {
+        post: {
+          summary: 'Upload Profile Photo',
+          description:
+            'Uploads a member profile photo (JPEG, PNG, WebP up to 5MB) with magic byte verification.',
+          tags: ['Files'],
+          security: [{ cookieAuth: [] }, { bearerAuth: [] }],
+          requestBody: {
+            required: true,
+            content: {
+              'multipart/form-data': {
+                schema: {
+                  type: 'object',
+                  properties: {
+                    file: { type: 'string', format: 'binary' },
+                  },
+                },
+              },
+            },
+          },
+          responses: {
+            '201': { description: 'Profile photo uploaded successfully' },
+            '400': { description: 'Invalid image format or size exceeded' },
+            '401': { description: 'Unauthorized' },
+          },
+        },
+      },
+      '/api/v1/files/{fileId}/download': {
+        get: {
+          summary: 'Download Stored File',
+          description:
+            'Securely downloads or streams a file. Zero-trust check returns 404 if not owned by member.',
+          tags: ['Files'],
+          security: [{ cookieAuth: [] }, { bearerAuth: [] }],
+          parameters: [
+            {
+              name: 'fileId',
+              in: 'path',
+              required: true,
+              schema: { type: 'string' },
+            },
+          ],
+          responses: {
+            '200': { description: 'File binary stream' },
+            '401': { description: 'Unauthorized' },
+            '404': { description: 'File not found' },
+          },
+        },
+      },
       '/api/v1/auth/login': {
         post: {
           summary: 'Member Login',

@@ -28,3 +28,7 @@ coverage/
 # Docker volumes
 postgres_data/
 node_modules
+
+# Local Uploads
+uploads/
+
