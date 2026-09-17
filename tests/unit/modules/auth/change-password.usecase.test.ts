@@ -2,12 +2,16 @@ import { PrismaClient } from '@prisma/client';
 import { ChangePasswordUseCase } from '../../../../src/modules/auth/application/change-password.usecase';
 import { IHashProvider, IEmailProvider } from '../../../../src/shared/providers';
 import { SessionService } from '../../../../src/modules/auth/infrastructure/session.service';
+import { PasswordHistoryService } from '../../../../src/modules/auth/infrastructure/password-history.service';
+import { ValidationError } from '../../../../src/shared/errors';
+import { PASSWORD_HISTORY_REUSE_ERROR } from '../../../../src/modules/auth/domain';
 
 describe('ChangePasswordUseCase Unit Tests', () => {
   let mockPrisma: jest.Mocked<PrismaClient>;
   let mockHashProvider: jest.Mocked<IHashProvider>;
   let mockSessionService: jest.Mocked<SessionService>;
   let mockEmailProvider: jest.Mocked<IEmailProvider>;
+  let mockPasswordHistoryService: jest.Mocked<PasswordHistoryService>;
   let useCase: ChangePasswordUseCase;
 
   beforeEach(() => {
@@ -35,11 +39,17 @@ describe('ChangePasswordUseCase Unit Tests', () => {
       sendEmail: jest.fn().mockResolvedValue(undefined),
     };
 
+    mockPasswordHistoryService = {
+      assertNotReused: jest.fn().mockResolvedValue(undefined),
+      archiveAndPrune: jest.fn().mockResolvedValue(undefined),
+    } as unknown as jest.Mocked<PasswordHistoryService>;
+
     useCase = new ChangePasswordUseCase(
       mockPrisma,
       mockHashProvider,
       mockSessionService,
       mockEmailProvider,
+      mockPasswordHistoryService,
     );
   });
 
@@ -79,7 +89,7 @@ describe('ChangePasswordUseCase Unit Tests', () => {
     ).rejects.toThrow('Current password is incorrect.');
   });
 
-  it('should throw ValidationError if newPassword === currentPassword', async () => {
+  it('should throw ValidationError if password history service rejects reuse of recent passwords', async () => {
     const mockUser = {
       id: 'user-1',
       email: 'user@example.com',
@@ -87,6 +97,9 @@ describe('ChangePasswordUseCase Unit Tests', () => {
     };
     (mockPrisma.user.findUnique as jest.Mock).mockResolvedValue(mockUser);
     (mockHashProvider.verify as jest.Mock).mockResolvedValue(true);
+    mockPasswordHistoryService.assertNotReused.mockRejectedValueOnce(
+      new ValidationError(PASSWORD_HISTORY_REUSE_ERROR),
+    );
 
     await expect(
       useCase.execute(
@@ -97,7 +110,13 @@ describe('ChangePasswordUseCase Unit Tests', () => {
         },
         { userId: 'user-1' },
       ),
-    ).rejects.toThrow('New password cannot be identical to the current password.');
+    ).rejects.toThrow(PASSWORD_HISTORY_REUSE_ERROR);
+
+    expect(mockPasswordHistoryService.assertNotReused).toHaveBeenCalledWith(
+      'user-1',
+      '$argon2id$oldhash',
+      'OldPassword123',
+    );
   });
 
   it('should throw ValidationError if newPassword matches user email or local part (SEC-21)', async () => {
@@ -122,7 +141,7 @@ describe('ChangePasswordUseCase Unit Tests', () => {
     ).rejects.toThrow('Password cannot be the same as your email address or username.');
   });
 
-  it('should successfully update password, revoke other sessions, log audit entry and notify user via email', async () => {
+  it('should successfully update password, archive/prune history, revoke other sessions, log audit entry and notify user via email', async () => {
     const mockUser = {
       id: 'user-1',
       email: 'john.doe@example.com',
@@ -146,6 +165,16 @@ describe('ChangePasswordUseCase Unit Tests', () => {
     expect(result.success).toBe(true);
     expect(result.message).toBe('Password changed successfully.');
 
+    expect(mockPasswordHistoryService.assertNotReused).toHaveBeenCalledWith(
+      'user-1',
+      '$argon2id$oldhash',
+      'NewPassword123',
+    );
+    expect(mockPasswordHistoryService.archiveAndPrune).toHaveBeenCalledWith(
+      mockPrisma,
+      'user-1',
+      '$argon2id$oldhash',
+    );
     expect(mockHashProvider.hash).toHaveBeenCalledWith('NewPassword123');
     expect(mockPrisma.user.update).toHaveBeenCalledWith({
       where: { id: 'user-1' },

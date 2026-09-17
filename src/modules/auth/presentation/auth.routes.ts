@@ -48,6 +48,13 @@ router.post(
   controller.changePassword,
 );
 
+router.patch(
+  '/password',
+  requireAuth,
+  validateRequest({ body: changePasswordSchema }),
+  controller.changePassword,
+);
+
 router.post('/logout', controller.logout);
 
 export const authRouter = router;

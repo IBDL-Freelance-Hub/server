@@ -899,6 +899,34 @@ const options: swaggerJsdoc.Options = {
           },
         },
       },
+      '/api/v1/auth/password': {
+        patch: {
+          summary: 'Change Password (RESTful)',
+          description:
+            'Updates password for authenticated member, strictly enforcing password history policy (cannot reuse current or last 3 passwords).',
+          tags: ['Auth'],
+          security: [{ cookieAuth: [] }, { bearerAuth: [] }],
+          requestBody: {
+            required: true,
+            content: {
+              'application/json': {
+                schema: { $ref: '#/components/schemas/ChangePasswordRequest' },
+              },
+            },
+          },
+          responses: {
+            '200': {
+              description: 'Password updated successfully',
+            },
+            '400': {
+              description: 'Validation failed or candidate password reuses recent passwords',
+            },
+            '401': {
+              description: 'Unauthorized or incorrect current password',
+            },
+          },
+        },
+      },
       '/api/v1/auth/logout': {
         post: {
           summary: 'Logout Member',

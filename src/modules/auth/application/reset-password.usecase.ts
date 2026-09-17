@@ -6,6 +6,10 @@ import {
   SessionService,
   sessionService as defaultSessionService,
 } from '../infrastructure/session.service';
+import {
+  PasswordHistoryService,
+  passwordHistoryService as defaultPasswordHistoryService,
+} from '../infrastructure/password-history.service';
 import { ResetPasswordInput } from '../presentation/auth.schema';
 
 export interface ResetPasswordResult {
@@ -23,6 +27,7 @@ export class ResetPasswordUseCase {
     private prisma: PrismaClient = defaultPrisma,
     private hashProv: IHashProvider = hashProvider,
     private sessionSvc: SessionService = defaultSessionService,
+    private passwordHistorySvc: PasswordHistoryService = defaultPasswordHistoryService,
   ) {}
 
   async execute(input: ResetPasswordInput, meta?: RequestMeta): Promise<ResetPasswordResult> {
@@ -49,7 +54,10 @@ export class ResetPasswordUseCase {
 
     const user = verToken.user;
 
-    // 3. SEC-21: Validate newPassword does not equal email or email local part
+    // 3. SEC Password History Policy: Reject if newPassword matches current or last 3 historical passwords
+    await this.passwordHistorySvc.assertNotReused(user.id, user.passwordHash, input.newPassword);
+
+    // 4. SEC-21: Validate newPassword does not equal email or email local part
     const emailLower = user.email.toLowerCase();
     const localPart = emailLower.split('@')[0];
     const newPasswordLower = input.newPassword.toLowerCase();
@@ -58,11 +66,14 @@ export class ResetPasswordUseCase {
       throw new ValidationError('Password cannot be your email address or username.');
     }
 
-    // 4. Hash new password
+    // 5. Hash new password
     const newPasswordHash = await this.hashProv.hash(input.newPassword);
 
-    // 5. Execute in single Prisma transaction with Session Revocation
+    // 6. Execute in single Prisma transaction with Session Revocation & Password Archival
     await this.prisma.$transaction(async (tx) => {
+      // Archive current passwordHash and prune obsolete records beyond depth 3
+      await this.passwordHistorySvc.archiveAndPrune(tx, user.id, user.passwordHash);
+
       // Update User passwordHash
       await tx.user.update({
         where: { id: user.id },

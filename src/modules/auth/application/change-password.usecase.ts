@@ -11,6 +11,10 @@ import {
   SessionService,
   sessionService as defaultSessionService,
 } from '../infrastructure/session.service';
+import {
+  PasswordHistoryService,
+  passwordHistoryService as defaultPasswordHistoryService,
+} from '../infrastructure/password-history.service';
 import { ChangePasswordInput } from '../presentation/auth.schema';
 
 import { buildBrandEmailHtml } from '../../../shared/templates/email-template';
@@ -36,6 +40,7 @@ export class ChangePasswordUseCase {
     private hashProv: IHashProvider = defaultHashProvider,
     private sessionSvc: SessionService = defaultSessionService,
     private emailSvc: IEmailProvider = defaultEmailProvider,
+    private passwordHistorySvc: PasswordHistoryService = defaultPasswordHistoryService,
   ) {}
 
   async execute(
@@ -58,10 +63,8 @@ export class ChangePasswordUseCase {
       throw new AuthenticationError('Current password is incorrect.');
     }
 
-    // 3. Reject if newPassword === currentPassword
-    if (input.newPassword === input.currentPassword) {
-      throw new ValidationError('New password cannot be identical to the current password.');
-    }
+    // 3. SEC Password History Policy: Reject if newPassword matches current or last 3 historical passwords
+    await this.passwordHistorySvc.assertNotReused(user.id, user.passwordHash, input.newPassword);
 
     // 4. Reject if newPassword matches email or local part (SEC-21)
     const lowerNew = input.newPassword.toLowerCase();
@@ -76,8 +79,11 @@ export class ChangePasswordUseCase {
     const newPasswordHash = await this.hashProv.hash(input.newPassword);
     const ipAddress = meta?.ipAddress || '';
 
-    // 6. Execute atomic update, session revocation, and audit logging
+    // 6. Execute atomic update, archival & pruning, session revocation, and audit logging
     await this.prisma.$transaction(async (tx) => {
+      // Archive current passwordHash and prune obsolete records beyond depth 3
+      await this.passwordHistorySvc.archiveAndPrune(tx, user.id, user.passwordHash);
+
       // Update User passwordHash
       await tx.user.update({
         where: { id: user.id },

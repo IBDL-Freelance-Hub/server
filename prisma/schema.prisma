@@ -87,6 +87,7 @@ model User {
   staff              Staff?
   sessions           Session[]
   verificationTokens VerificationToken[]
+  passwordHistory    PasswordHistory[]
 }
 
 model Member {
@@ -272,4 +273,15 @@ model EmailLockout {
   failedAttemptCount Int       @default(0)
   lockedUntil        DateTime?
   updatedAt          DateTime  @updatedAt
+}
+
+model PasswordHistory {
+  id           String   @id @default(uuid())
+  userId       String
+  passwordHash String
+  createdAt    DateTime @default(now())
+
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, createdAt(sort: Desc)])
 }
