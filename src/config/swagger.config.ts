@@ -688,6 +688,21 @@ const options: swaggerJsdoc.Options = {
             },
           },
         },
+        delete: {
+          summary: 'Revoke All Other Sessions',
+          description:
+            'Terminates all active login sessions for the authenticated member except the current one.',
+          tags: ['Auth'],
+          security: [{ cookieAuth: [] }, { bearerAuth: [] }],
+          responses: {
+            '200': {
+              description: 'Other sessions revoked successfully',
+            },
+            '401': {
+              description: 'Unauthorized',
+            },
+          },
+        },
       },
       '/api/v1/auth/sessions/{sessionId}': {
         delete: {
