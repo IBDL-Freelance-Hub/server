@@ -1,6 +1,10 @@
 import { Router } from 'express';
-import { validateRequest } from '../../../shared/middleware';
-import { registerMemberSchema, checkDuplicateSchema } from './members.schema';
+import { validateRequest, requireAuth } from '../../../shared/middleware';
+import {
+  registerMemberSchema,
+  checkDuplicateSchema,
+  updateMemberProfileSchema,
+} from './members.schema';
 import { MembersController } from './members.controller';
 
 const router = Router();
@@ -12,6 +16,16 @@ router.post(
   '/check-duplicate',
   validateRequest({ body: checkDuplicateSchema }),
   controller.checkDuplicate,
+);
+
+// Member Profile Routes (Protected)
+router.get('/profile', requireAuth, controller.getProfile);
+
+router.patch(
+  '/profile',
+  requireAuth,
+  validateRequest({ body: updateMemberProfileSchema }),
+  controller.updateProfile,
 );
 
 export const membersRouter = router;

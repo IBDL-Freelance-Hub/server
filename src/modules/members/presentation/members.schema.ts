@@ -58,3 +58,78 @@ export const checkDuplicateSchema = z
   );
 
 export type CheckDuplicateInput = z.infer<typeof checkDuplicateSchema>;
+
+export const updateMemberProfileSchema = z
+  .object({
+    fullNameEn: z
+      .string({ invalid_type_error: 'Full name in English must be a string' })
+      .trim()
+      .min(2, 'Full name in English must be at least 2 characters long')
+      .optional(),
+    fullNameAr: z
+      .string()
+      .trim()
+      .refine((val) => val.length === 0 || val.length >= 2, {
+        message: 'Arabic full name must be at least 2 characters long if provided',
+      })
+      .transform((val) => (val.length === 0 ? null : val))
+      .nullable()
+      .optional(),
+    phone: z
+      .string({ invalid_type_error: 'Phone number must be a string' })
+      .trim()
+      .refine((val) => val.replace(/\D/g, '').length >= 7, {
+        message: 'Phone number must contain at least 7 digits',
+      })
+      .optional(),
+    country: z.string().trim().min(1, 'Country cannot be empty').optional(),
+    city: z
+      .string({ invalid_type_error: 'City must be a string' })
+      .trim()
+      .min(1, 'City cannot be empty or whitespace (VAL-52, VAL-57)')
+      .optional(),
+    yearsOfExperience: z
+      .enum(experienceBands, {
+        errorMap: () => ({ message: 'Invalid years of experience band selected' }),
+      })
+      .optional(),
+    areasOfExpertise: z.array(z.string().trim()).optional(),
+    industriesServed: z.array(z.string().trim()).optional(),
+    languages: z.array(z.string().trim()).optional(),
+    bioEn: z
+      .string()
+      .trim()
+      .max(1000, 'English biography cannot exceed 1000 characters (VAL-08)')
+      .transform((val) => (val === '' ? null : val))
+      .nullable()
+      .optional(),
+    bioAr: z
+      .string()
+      .trim()
+      .max(1000, 'Arabic biography cannot exceed 1000 characters (VAL-08)')
+      .transform((val) => (val === '' ? null : val))
+      .nullable()
+      .optional(),
+    linkedinUrl: z
+      .string()
+      .trim()
+      .refine((val) => !val || z.string().url().safeParse(val).success, {
+        message: 'Invalid LinkedIn URL format',
+      })
+      .transform((val) => (!val ? null : val))
+      .nullable()
+      .optional(),
+    directoryOptIn: z.boolean().optional(),
+    email: z.any().optional(),
+  })
+  .superRefine((data, ctx) => {
+    if ('email' in data && (data as Record<string, unknown>).email !== undefined) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: 'Email address is read-only and cannot be modified (PRO-04, VAL-50)',
+        path: ['email'],
+      });
+    }
+  });
+
+export type UpdateMemberProfileInput = z.infer<typeof updateMemberProfileSchema>;

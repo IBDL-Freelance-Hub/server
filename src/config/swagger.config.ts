@@ -103,6 +103,40 @@ const options: swaggerJsdoc.Options = {
             country: { type: 'string', example: 'Egypt' },
           },
         },
+        UpdateMemberProfileRequest: {
+          type: 'object',
+          properties: {
+            fullNameEn: { type: 'string', example: 'John Doe' },
+            fullNameAr: { type: 'string', example: 'جون دو' },
+            phone: { type: 'string', example: '+201012345678' },
+            country: { type: 'string', example: 'Egypt' },
+            city: { type: 'string', example: 'Cairo' },
+            yearsOfExperience: {
+              type: 'string',
+              enum: ['<2', '2-5', '6-10', '11-15', '>15'],
+              example: '6-10',
+            },
+            areasOfExpertise: {
+              type: 'array',
+              items: { type: 'string' },
+              example: ['Backend', 'Node.js'],
+            },
+            industriesServed: {
+              type: 'array',
+              items: { type: 'string' },
+              example: ['FinTech', 'E-commerce'],
+            },
+            languages: {
+              type: 'array',
+              items: { type: 'string' },
+              example: ['Arabic', 'English'],
+            },
+            bioEn: { type: 'string', example: 'Experienced senior engineer.' },
+            bioAr: { type: 'string', example: 'مهندس برمجيات ذو خبرة.' },
+            linkedinUrl: { type: 'string', example: 'https://linkedin.com/in/johndoe' },
+            directoryOptIn: { type: 'boolean', default: false },
+          },
+        },
         LoginRequest: {
           type: 'object',
           required: ['email', 'password'],
@@ -261,6 +295,55 @@ const options: swaggerJsdoc.Options = {
                   },
                 },
               },
+            },
+          },
+        },
+      },
+      '/api/v1/members/profile': {
+        get: {
+          summary: 'Get Current Member Profile',
+          description:
+            'Retrieves profile details and profile completion calculation for the authenticated member.',
+          tags: ['Members'],
+          security: [{ cookieAuth: [] }, { bearerAuth: [] }],
+          responses: {
+            '200': {
+              description: 'Profile retrieved successfully',
+            },
+            '401': {
+              description: 'Unauthorized / invalid session',
+            },
+            '404': {
+              description: 'Member profile not found',
+            },
+          },
+        },
+        patch: {
+          summary: 'Update Current Member Profile',
+          description:
+            'Updates member profile details, recalculates completion score, and logs profile audit trail.',
+          tags: ['Members'],
+          security: [{ cookieAuth: [] }, { bearerAuth: [] }],
+          requestBody: {
+            required: true,
+            content: {
+              'application/json': {
+                schema: { $ref: '#/components/schemas/UpdateMemberProfileRequest' },
+              },
+            },
+          },
+          responses: {
+            '200': {
+              description: 'Profile updated successfully',
+            },
+            '400': {
+              description: 'Validation failed or read-only email attempted',
+            },
+            '401': {
+              description: 'Unauthorized / invalid session',
+            },
+            '409': {
+              description: 'Mobile number clash with another member',
             },
           },
         },
