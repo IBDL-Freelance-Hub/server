@@ -4,6 +4,7 @@ import { RegisterMemberUseCase } from '../application/register-member.usecase';
 import { CheckDuplicateRegistrationUseCase } from '../application/check-duplicate-registration.usecase';
 import { GetMemberProfileUseCase } from '../application/get-member-profile.usecase';
 import { UpdateMemberProfileUseCase } from '../application/update-member-profile.usecase';
+import { GetMemberDashboardUseCase } from '../application/get-member-dashboard.usecase';
 import {
   RegisterMemberInput,
   CheckDuplicateInput,
@@ -18,6 +19,7 @@ export class MembersController {
     private readonly checkDuplicateUseCase: CheckDuplicateRegistrationUseCase = new CheckDuplicateRegistrationUseCase(),
     private readonly getProfileUseCase: GetMemberProfileUseCase = new GetMemberProfileUseCase(),
     private readonly updateProfileUseCase: UpdateMemberProfileUseCase = new UpdateMemberProfileUseCase(),
+    private readonly getDashboardUseCase: GetMemberDashboardUseCase = new GetMemberDashboardUseCase(),
   ) {}
 
   register = async (
@@ -66,6 +68,23 @@ export class MembersController {
       }
 
       const result = await this.getProfileUseCase.execute(req.user.id);
+
+      res.status(200).json({
+        success: true,
+        data: result,
+      });
+    } catch (error) {
+      next(error);
+    }
+  };
+
+  getDashboard = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+    try {
+      if (!req.user) {
+        throw new AuthenticationError('Your session has ended. Please sign in again.');
+      }
+
+      const result = await this.getDashboardUseCase.execute(req.user.id);
 
       res.status(200).json({
         success: true,

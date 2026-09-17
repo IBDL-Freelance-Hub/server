@@ -18,7 +18,8 @@ router.post(
   controller.checkDuplicate,
 );
 
-// Member Profile Routes (Protected)
+// Member Dashboard & Profile Routes (Protected)
+router.get('/dashboard', requireAuth, controller.getDashboard);
 router.get('/profile', requireAuth, controller.getProfile);
 
 router.patch(

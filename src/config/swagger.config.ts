@@ -137,6 +137,78 @@ const options: swaggerJsdoc.Options = {
             directoryOptIn: { type: 'boolean', default: false },
           },
         },
+        MemberDashboardResponse: {
+          type: 'object',
+          properties: {
+            member: {
+              type: 'object',
+              properties: {
+                id: { type: 'string', format: 'uuid' },
+                fullNameEn: { type: 'string', example: 'John Doe' },
+                fullNameAr: { type: 'string', nullable: true, example: 'جون دو' },
+                email: { type: 'string', format: 'email', example: 'john.doe@example.com' },
+                city: { type: 'string', nullable: true, example: 'Cairo' },
+                country: { type: 'string', example: 'Egypt' },
+                profileCompletionRate: { type: 'integer', example: 82 },
+                photoUrl: {
+                  type: 'string',
+                  nullable: true,
+                  example: '/api/v1/files/uuid-123/download',
+                },
+              },
+            },
+            membership: {
+              type: 'object',
+              properties: {
+                tier: {
+                  type: 'string',
+                  enum: ['ESSENTIAL', 'PROFESSIONAL', 'MASTER'],
+                  example: 'PROFESSIONAL',
+                },
+                status: {
+                  type: 'string',
+                  enum: ['ACTIVE', 'EXPIRED', 'SUSPENDED'],
+                  example: 'ACTIVE',
+                },
+                startDate: { type: 'string', format: 'date-time' },
+                renewsOn: { type: 'string', format: 'date-time', nullable: true },
+                daysUntilRenewal: { type: 'integer', example: 180 },
+              },
+            },
+            entitlements: {
+              type: 'object',
+              properties: {
+                tier: { type: 'string', example: 'PROFESSIONAL' },
+                tierName: { type: 'string', example: 'Professional' },
+                status: { type: 'string', example: 'ACTIVE' },
+                isActive: { type: 'boolean', example: true },
+                benefits: { type: 'object' },
+                directoryEligibility: { type: 'object' },
+              },
+            },
+            profileProgress: {
+              type: 'object',
+              properties: {
+                completionPercentage: { type: 'integer', example: 82 },
+                missingFields: { type: 'array', items: { type: 'string' } },
+              },
+            },
+            recentActivity: {
+              type: 'array',
+              items: {
+                type: 'object',
+                properties: {
+                  id: { type: 'string', format: 'uuid' },
+                  action: { type: 'string', example: 'MEMBER_REGISTERED' },
+                  resource: { type: 'string', example: 'Member' },
+                  resourceId: { type: 'string', nullable: true },
+                  reason: { type: 'string', nullable: true },
+                  createdAt: { type: 'string', format: 'date-time' },
+                },
+              },
+            },
+          },
+        },
         LoginRequest: {
           type: 'object',
           required: ['email', 'password'],
@@ -295,6 +367,37 @@ const options: swaggerJsdoc.Options = {
                   },
                 },
               },
+            },
+          },
+        },
+      },
+      '/api/v1/members/dashboard': {
+        get: {
+          summary: 'Get Member Dashboard',
+          description:
+            'Aggregates member profile data, membership tier, server-side entitlements, live profile progress, and recent audit activity feed (SEC-33, MEM-01 to MEM-12, PRO-13, PRO-14).',
+          tags: ['Members'],
+          security: [{ cookieAuth: [] }, { bearerAuth: [] }],
+          responses: {
+            '200': {
+              description: 'Member dashboard aggregated data retrieved successfully',
+              content: {
+                'application/json': {
+                  schema: {
+                    type: 'object',
+                    properties: {
+                      success: { type: 'boolean', example: true },
+                      data: { $ref: '#/components/schemas/MemberDashboardResponse' },
+                    },
+                  },
+                },
+              },
+            },
+            '401': {
+              description: 'Unauthorized / invalid session',
+            },
+            '404': {
+              description: 'Member record not found',
             },
           },
         },
