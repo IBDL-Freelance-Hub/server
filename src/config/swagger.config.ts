@@ -209,6 +209,59 @@ const options: swaggerJsdoc.Options = {
             },
           },
         },
+        UpgradeMembershipRequest: {
+          type: 'object',
+          required: ['targetTier'],
+          properties: {
+            targetTier: {
+              type: 'string',
+              enum: ['PROFESSIONAL', 'MASTER'],
+              example: 'PROFESSIONAL',
+            },
+            paymentMethodToken: {
+              type: 'string',
+              example: 'mock-token-success',
+            },
+            simulationOutcome: {
+              type: 'string',
+              enum: ['SUCCESS', 'FAIL', 'PENDING'],
+              example: 'SUCCESS',
+            },
+          },
+        },
+        UpgradeMembershipResponse: {
+          type: 'object',
+          properties: {
+            success: { type: 'boolean', example: true },
+            data: {
+              type: 'object',
+              properties: {
+                paymentStatus: {
+                  type: 'string',
+                  enum: ['SUCCESSFUL', 'PENDING', 'DECLINED'],
+                  example: 'SUCCESSFUL',
+                },
+                transactionId: { type: 'string', example: 'txn_123456789' },
+                failureReason: { type: 'string', nullable: true },
+                membership: {
+                  type: 'object',
+                  properties: {
+                    id: { type: 'string', format: 'uuid' },
+                    tier: { type: 'string', example: 'PROFESSIONAL' },
+                    status: { type: 'string', example: 'ACTIVE' },
+                    startDate: { type: 'string', format: 'date-time' },
+                    endDate: { type: 'string', format: 'date-time' },
+                    price: { type: 'number', example: 180.0 },
+                  },
+                },
+                message: {
+                  type: 'string',
+                  example: 'Successfully upgraded to PROFESSIONAL membership.',
+                },
+              },
+            },
+          },
+        },
         LoginRequest: {
           type: 'object',
           required: ['email', 'password'],
@@ -447,6 +500,50 @@ const options: swaggerJsdoc.Options = {
             },
             '409': {
               description: 'Mobile number clash with another member',
+            },
+          },
+        },
+      },
+      '/api/v1/memberships/upgrade': {
+        post: {
+          summary: 'Upgrade Membership Tier via Sandbox Payment Simulator',
+          description:
+            'Upgrades an active member to a higher tier with simulated payment processing (MEM-07 to MEM-18, PAY-01 to PAY-12, SEC-33). Pricing is strictly computed server-side.',
+          tags: ['Membership'],
+          security: [{ cookieAuth: [] }, { bearerAuth: [] }],
+          requestBody: {
+            required: true,
+            content: {
+              'application/json': {
+                schema: { $ref: '#/components/schemas/UpgradeMembershipRequest' },
+              },
+            },
+          },
+          responses: {
+            '200': {
+              description: 'Membership upgraded or payment pending',
+              content: {
+                'application/json': {
+                  schema: { $ref: '#/components/schemas/UpgradeMembershipResponse' },
+                },
+              },
+            },
+            '400': {
+              description: 'Validation failed or invalid upgrade hierarchy (downgrade / same tier)',
+            },
+            '401': {
+              description: 'Unauthorized / invalid session',
+            },
+            '402': {
+              description: 'Payment transaction was declined by the issuer (PAY-05, MEM-14)',
+              content: {
+                'application/json': {
+                  schema: { $ref: '#/components/schemas/UpgradeMembershipResponse' },
+                },
+              },
+            },
+            '404': {
+              description: 'Member profile not found',
             },
           },
         },

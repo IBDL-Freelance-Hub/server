@@ -14,6 +14,7 @@ import { NotFoundError } from './shared/errors';
 import { membersRouter } from './modules/members/presentation/members.routes';
 import { authRouter } from './modules/auth/presentation/auth.routes';
 import { filesRouter } from './modules/files/presentation/files.routes';
+import { membershipRouter } from './modules/membership/presentation/membership.routes';
 
 const app: Express = express();
 
@@ -124,6 +125,7 @@ app.get(['/docs', '/docs/', '/api-docs', '/api-docs/'], (_req: Request, res: Res
 app.use('/api/v1/members', membersRouter);
 app.use('/api/v1/auth', authRouter);
 app.use('/api/v1/files', filesRouter);
+app.use('/api/v1/memberships', membershipRouter);
 
 // 11. Catch-All 404 Route Handler
 app.use((req: Request, _res: Response, next: NextFunction) => {
