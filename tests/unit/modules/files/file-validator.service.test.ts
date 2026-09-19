@@ -173,4 +173,52 @@ describe('FileValidatorService Unit Tests', () => {
       );
     });
   });
+
+  describe('Malware and Prohibited Executable Scanning (REJECTED_MALWARE, SEC-32)', () => {
+    const eicarString = 'X5O!P%@AP[4\\PZX54(P^)7CC)7}$EICAR-STANDARD-ANTIVIRUS-TEST-FILE!$H+H*';
+
+    it('should reject file containing EICAR test signature with REJECTED_MALWARE', () => {
+      const eicarBuffer = Buffer.from(eicarString);
+      expect(() => validator.scanForMalware(eicarBuffer)).toThrow(ValidationError);
+      expect(() => validator.scanForMalware(eicarBuffer)).toThrow('REJECTED_MALWARE');
+    });
+
+    it('should reject PDF containing embedded EICAR test signature', () => {
+      const maliciousPdf = Buffer.concat([
+        Buffer.from('%PDF-1.7\nstream\n'),
+        Buffer.from(eicarString),
+        Buffer.from('\nendstream'),
+      ]);
+      expect(() => validator.validateCv(maliciousPdf, 'cv.pdf')).toThrow(ValidationError);
+      expect(() => validator.validateCv(maliciousPdf, 'cv.pdf')).toThrow('REJECTED_MALWARE');
+    });
+
+    it('should reject Windows PE executable header (MZ at offset 0)', () => {
+      const peBuffer = Buffer.from([0x4d, 0x5a, 0x90, 0x00, 0x03, 0x00]);
+      expect(() => validator.scanForMalware(peBuffer)).toThrow(ValidationError);
+      expect(() => validator.scanForMalware(peBuffer)).toThrow('REJECTED_MALWARE');
+      expect(() => validator.validateCv(peBuffer, 'resume.pdf')).toThrow('REJECTED_MALWARE');
+      expect(() => validator.validateProfilePhoto(peBuffer, 'avatar.png')).toThrow(
+        'REJECTED_MALWARE',
+      );
+    });
+
+    it('should reject Linux ELF executable header (\\x7fELF at offset 0)', () => {
+      const elfBuffer = Buffer.from([0x7f, 0x45, 0x4c, 0x46, 0x02, 0x01, 0x01, 0x00]);
+      expect(() => validator.scanForMalware(elfBuffer)).toThrow(ValidationError);
+      expect(() => validator.scanForMalware(elfBuffer)).toThrow('REJECTED_MALWARE');
+      expect(() => validator.validateCv(elfBuffer, 'binary.pdf')).toThrow('REJECTED_MALWARE');
+    });
+
+    it('should reject Mach-O executable header', () => {
+      const machOBuffer = Buffer.from([0xfe, 0xed, 0xfa, 0xce, 0x00, 0x00, 0x00, 0x01]);
+      expect(() => validator.scanForMalware(machOBuffer)).toThrow(ValidationError);
+      expect(() => validator.scanForMalware(machOBuffer)).toThrow('REJECTED_MALWARE');
+    });
+
+    it('should pass cleanly for safe buffers', () => {
+      const safeBuffer = Buffer.from('%PDF-1.7 safe text content');
+      expect(() => validator.scanForMalware(safeBuffer)).not.toThrow();
+    });
+  });
 });

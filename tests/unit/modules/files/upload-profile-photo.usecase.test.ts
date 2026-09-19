@@ -1,13 +1,13 @@
 import { PrismaClient } from '@prisma/client';
 import { UploadProfilePhotoUseCase } from '../../../../src/modules/files/application/upload-profile-photo.usecase';
+import { StorageProvider } from '../../../../src/modules/files/domain';
 import { FileValidatorService } from '../../../../src/modules/files/infrastructure/file-validator.service';
-import { StorageService } from '../../../../src/modules/files/infrastructure/storage.service';
 import { NotFoundError, ValidationError } from '../../../../src/shared/errors';
 
 describe('UploadProfilePhotoUseCase Unit Tests', () => {
   let mockPrisma: jest.Mocked<PrismaClient>;
   let mockValidator: jest.Mocked<FileValidatorService>;
-  let mockStorage: jest.Mocked<StorageService>;
+  let mockStorage: jest.Mocked<StorageProvider>;
   let useCase: UploadProfilePhotoUseCase;
 
   const mockDbMember = {
@@ -56,12 +56,10 @@ describe('UploadProfilePhotoUseCase Unit Tests', () => {
     } as unknown as jest.Mocked<FileValidatorService>;
 
     mockStorage = {
-      saveFile: jest.fn(),
-      getFileBuffer: jest.fn(),
-      getFileInputStream: jest.fn(),
-      deleteFile: jest.fn(),
-      fileExists: jest.fn(),
-    } as unknown as jest.Mocked<StorageService>;
+      save: jest.fn(),
+      getSignedDownloadUrl: jest.fn(),
+      delete: jest.fn(),
+    } as unknown as jest.Mocked<StorageProvider>;
 
     useCase = new UploadProfilePhotoUseCase(mockPrisma, mockValidator, mockStorage);
   });
@@ -75,7 +73,7 @@ describe('UploadProfilePhotoUseCase Unit Tests', () => {
       sizeBytes: 4096,
     });
 
-    mockStorage.saveFile.mockResolvedValue('photo-uuid-456.png');
+    mockStorage.save.mockResolvedValue('photo-uuid-456.png');
 
     const result = await useCase.execute(
       'user-photo-1',
@@ -98,7 +96,11 @@ describe('UploadProfilePhotoUseCase Unit Tests', () => {
     )._mockTx;
 
     // Verify storage saved with non-guessable key
-    expect(mockStorage.saveFile).toHaveBeenCalledWith(expect.any(Buffer), 'png');
+    expect(mockStorage.save).toHaveBeenCalledWith(
+      expect.any(Buffer),
+      expect.stringMatching(/^[0-9a-f-]+\.png$/),
+      'image/png',
+    );
 
     // Verify previous active photos superseded
     expect(mockTx.file.updateMany).toHaveBeenCalledWith({
@@ -163,7 +165,7 @@ describe('UploadProfilePhotoUseCase Unit Tests', () => {
     ).rejects.toThrow(ValidationError);
 
     expect(mockPrisma.member.findUnique).not.toHaveBeenCalled();
-    expect(mockStorage.saveFile).not.toHaveBeenCalled();
+    expect(mockStorage.save).not.toHaveBeenCalled();
   });
 
   it('should throw NotFoundError if member profile is not found', async () => {

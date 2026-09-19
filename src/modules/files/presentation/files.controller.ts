@@ -4,6 +4,8 @@ import { UploadProfilePhotoUseCase } from '../application/upload-profile-photo.u
 import { DownloadFileUseCase } from '../application/download-file.usecase';
 import { AuthenticationError, ValidationError } from '../../../shared/errors';
 import { getClientIp } from '../../../shared/utils';
+import { getStorageProvider } from '../infrastructure/storage-provider.factory';
+import { LocalDiskStorageProvider } from '../infrastructure/local-disk-storage.provider';
 
 export class FilesController {
   constructor(
@@ -93,19 +95,64 @@ export class FilesController {
         throw new ValidationError('File ID is required');
       }
 
-      const { file, stream } = await this.downloadFileUseCase.execute(
+      const { file, downloadUrl } = await this.downloadFileUseCase.execute(
         fileId,
         req.user.id,
         req.user.userType,
       );
 
-      res.setHeader('Content-Type', file.mimeType);
-      res.setHeader('Content-Length', file.sizeBytes);
-      res.setHeader(
-        'Content-Disposition',
-        `inline; filename="${encodeURIComponent(file.originalName)}"`,
-      );
+      if (req.query.redirect === 'false' || req.headers.accept?.includes('application/json')) {
+        res.status(200).json({
+          success: true,
+          data: {
+            file,
+            downloadUrl,
+          },
+        });
+        return;
+      }
 
+      res.redirect(downloadUrl);
+    } catch (error) {
+      next(error);
+    }
+  };
+
+  serveRawLocalFile = async (
+    req: Request<{ storageKey: string }>,
+    res: Response,
+    next: NextFunction,
+  ): Promise<void> => {
+    try {
+      const { storageKey } = req.params;
+      const { expires, sig } = req.query;
+
+      if (!storageKey || !expires || !sig) {
+        throw new ValidationError('Missing required signature or expiration parameter');
+      }
+
+      const expiresNum = Number(expires);
+      if (isNaN(expiresNum)) {
+        throw new ValidationError('Invalid expiration parameter');
+      }
+
+      const provider = getStorageProvider();
+      if (!(provider instanceof LocalDiskStorageProvider)) {
+        res.status(404).json({ success: false, message: 'Not found' });
+        return;
+      }
+
+      const isValid = provider.verifySignedUrl(storageKey, expiresNum, String(sig));
+      if (!isValid) {
+        res.status(403).json({
+          success: false,
+          code: 'URL_EXPIRED_OR_INVALID',
+          message: 'The requested download link has expired or is invalid.',
+        });
+        return;
+      }
+
+      const stream = provider.getFileInputStream(storageKey);
       stream.pipe(res);
     } catch (error) {
       next(error);

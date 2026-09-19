@@ -1,3 +1,4 @@
+import crypto from 'crypto';
 import path from 'path';
 import { PrismaClient } from '@prisma/client';
 import { prisma as defaultPrisma } from '../../../shared/providers';
@@ -6,10 +7,8 @@ import {
   FileValidatorService,
   fileValidatorService as defaultValidator,
 } from '../infrastructure/file-validator.service';
-import {
-  StorageService,
-  storageService as defaultStorage,
-} from '../infrastructure/storage.service';
+import { StorageProvider } from '../domain/storage-provider.interface';
+import { defaultStorageProvider } from '../infrastructure/storage-provider.factory';
 
 export interface UploadFileInput {
   buffer: Buffer;
@@ -26,7 +25,7 @@ export class UploadProfilePhotoUseCase {
   constructor(
     private readonly prisma: PrismaClient = defaultPrisma,
     private readonly validator: FileValidatorService = defaultValidator,
-    private readonly storage: StorageService = defaultStorage,
+    private readonly storage: StorageProvider = defaultStorageProvider,
   ) {}
 
   async execute(userId: string, fileInput: UploadFileInput, context?: UploadFileContext) {
@@ -34,7 +33,7 @@ export class UploadProfilePhotoUseCase {
       throw new ValidationError('No file provided for upload');
     }
 
-    // 1. Strict Magic Bytes & Size Validation (UPL-02, PRO-19, VAL-138)
+    // 1. Strict Magic Bytes, Size & In-Memory Malware Validation (UPL-02, PRO-19, VAL-138)
     const validated = this.validator.validateProfilePhoto(fileInput.buffer, fileInput.originalname);
 
     // 2. Fetch existing member
@@ -47,7 +46,8 @@ export class UploadProfilePhotoUseCase {
     }
 
     // 3. Persist file to storage with randomized UUID name (UPL-05)
-    const storageKey = await this.storage.saveFile(fileInput.buffer, validated.extension);
+    const key = `${crypto.randomUUID()}.${validated.extension}`;
+    const storageKey = await this.storage.save(fileInput.buffer, key, validated.mimeType);
 
     // 4. Atomic Transaction: Supersede old photos, save new record, update Member.photoFileId, and log audit
     const sanitizedOriginalName = path.basename(

@@ -1,3 +1,4 @@
+import crypto from 'crypto';
 import path from 'path';
 import { PrismaClient } from '@prisma/client';
 import { prisma as defaultPrisma } from '../../../shared/providers';
@@ -7,10 +8,8 @@ import {
   FileValidatorService,
   fileValidatorService as defaultValidator,
 } from '../infrastructure/file-validator.service';
-import {
-  StorageService,
-  storageService as defaultStorage,
-} from '../infrastructure/storage.service';
+import { StorageProvider } from '../domain/storage-provider.interface';
+import { defaultStorageProvider } from '../infrastructure/storage-provider.factory';
 
 export interface UploadFileInput {
   buffer: Buffer;
@@ -27,7 +26,7 @@ export class UploadCvUseCase {
   constructor(
     private readonly prisma: PrismaClient = defaultPrisma,
     private readonly validator: FileValidatorService = defaultValidator,
-    private readonly storage: StorageService = defaultStorage,
+    private readonly storage: StorageProvider = defaultStorageProvider,
   ) {}
 
   async execute(userId: string, fileInput: UploadFileInput, context?: UploadFileContext) {
@@ -35,7 +34,7 @@ export class UploadCvUseCase {
       throw new ValidationError('No file provided for upload');
     }
 
-    // 1. Strict Magic Bytes & Size Validation (UPL-02, UPL-14, VAL-138)
+    // 1. Strict Magic Bytes, Size & In-Memory Malware Validation (UPL-02, UPL-14, VAL-138)
     // If validation fails, existing CV remains untouched (VAL-60)
     const validated = this.validator.validateCv(fileInput.buffer, fileInput.originalname);
 
@@ -56,7 +55,8 @@ export class UploadCvUseCase {
 
     // 3. Persist file to storage with randomized UUID name (UPL-05)
     // If storage fails, existing CV remains untouched (VAL-60)
-    const storageKey = await this.storage.saveFile(fileInput.buffer, validated.extension);
+    const key = `${crypto.randomUUID()}.${validated.extension}`;
+    const storageKey = await this.storage.save(fileInput.buffer, key, validated.mimeType);
 
     // 4. Calculate updated profile completion rate with hasCv = true (VAL-58)
     const completion = calculateProfileCompletion({

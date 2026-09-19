@@ -24,6 +24,9 @@ export class FileValidatorService {
       throw new ValidationError('File buffer is empty or missing');
     }
 
+    // 0. Explicit in-memory malware & executable signature inspection (REJECTED_MALWARE)
+    this.scanForMalware(buffer);
+
     if (buffer.length > CV_MAX_SIZE_BYTES) {
       throw new ValidationError(
         `CV file size exceeds the 25 MB limit (received ${(buffer.length / (1024 * 1024)).toFixed(2)} MB)`,
@@ -75,6 +78,9 @@ export class FileValidatorService {
     if (!buffer || buffer.length === 0) {
       throw new ValidationError('File buffer is empty or missing');
     }
+
+    // 0. Explicit in-memory malware & executable signature inspection (REJECTED_MALWARE)
+    this.scanForMalware(buffer);
 
     if (buffer.length > PHOTO_MAX_SIZE_BYTES) {
       throw new ValidationError(
@@ -194,6 +200,60 @@ export class FileValidatorService {
       buf[11] === 0x50; // P
 
     return isRiff && isWebp;
+  }
+
+  /**
+   * Scans an in-memory buffer for known malware signatures and prohibited executable payloads.
+   * Runs before storage dispatch (UPL-02, SEC-32, REJECTED_MALWARE).
+   */
+  scanForMalware(buffer: Buffer): void {
+    if (!buffer || buffer.length === 0) {
+      return;
+    }
+
+    // 1. EICAR Standard Anti-Virus Test File signature
+    const eicarSignature = 'X5O!P%@AP[4\\PZX54(P^)7CC)7}$EICAR-STANDARD-ANTIVIRUS-TEST-FILE!$H+H*';
+    if (buffer.includes(Buffer.from(eicarSignature))) {
+      throw new ValidationError(
+        'Malware or prohibited executable signature detected in file (REJECTED_MALWARE)',
+      );
+    }
+
+    // 2. Windows PE executable header (MZ at offset 0)
+    if (buffer.length >= 2 && buffer[0] === 0x4d && buffer[1] === 0x5a) {
+      throw new ValidationError(
+        'Malware or prohibited executable signature detected in file (REJECTED_MALWARE)',
+      );
+    }
+
+    // 3. Linux ELF executable header (\x7fELF at offset 0)
+    if (
+      buffer.length >= 4 &&
+      buffer[0] === 0x7f &&
+      buffer[1] === 0x45 &&
+      buffer[2] === 0x4c &&
+      buffer[3] === 0x46
+    ) {
+      throw new ValidationError(
+        'Malware or prohibited executable signature detected in file (REJECTED_MALWARE)',
+      );
+    }
+
+    // 4. Mach-O executable header
+    if (buffer.length >= 4) {
+      const isMachO =
+        (buffer[0] === 0xfe &&
+          buffer[1] === 0xed &&
+          buffer[2] === 0xfa &&
+          (buffer[3] === 0xce || buffer[3] === 0xcf)) ||
+        (buffer[0] === 0xce && buffer[1] === 0xfa && buffer[2] === 0xed && buffer[3] === 0xfe) ||
+        (buffer[0] === 0xcf && buffer[1] === 0xfa && buffer[2] === 0xed && buffer[3] === 0xfe);
+      if (isMachO) {
+        throw new ValidationError(
+          'Malware or prohibited executable signature detected in file (REJECTED_MALWARE)',
+        );
+      }
+    }
   }
 }
 

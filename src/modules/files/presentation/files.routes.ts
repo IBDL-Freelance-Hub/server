@@ -2,6 +2,7 @@ import { Router } from 'express';
 import multer from 'multer';
 import { requireAuth } from '../../../shared/middleware';
 import { FilesController } from './files.controller';
+import { env } from '../../../config/env.config';
 
 const router = Router();
 const controller = new FilesController();
@@ -19,5 +20,10 @@ const upload = multer({
 router.post('/cv', requireAuth, upload.single('file'), controller.uploadCv);
 router.post('/photo', requireAuth, upload.single('file'), controller.uploadProfilePhoto);
 router.get('/:fileId/download', requireAuth, controller.downloadFile);
+
+// Development/Testing Only Route: Exclusively registered when STORAGE_PROVIDER === 'local'
+if (env.STORAGE_PROVIDER === 'local') {
+  router.get('/raw/:storageKey', controller.serveRawLocalFile);
+}
 
 export const filesRouter = router;

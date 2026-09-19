@@ -1,11 +1,8 @@
-import fs from 'fs';
 import { PrismaClient } from '@prisma/client';
 import { prisma as defaultPrisma } from '../../../shared/providers';
 import { NotFoundError } from '../../../shared/errors';
-import {
-  StorageService,
-  storageService as defaultStorage,
-} from '../infrastructure/storage.service';
+import { StorageProvider } from '../domain/storage-provider.interface';
+import { defaultStorageProvider } from '../infrastructure/storage-provider.factory';
 
 export interface DownloadFileResult {
   file: {
@@ -15,19 +12,20 @@ export interface DownloadFileResult {
     sizeBytes: number;
     category: string;
   };
-  stream: fs.ReadStream;
+  downloadUrl: string;
 }
 
 export class DownloadFileUseCase {
   constructor(
     private readonly prisma: PrismaClient = defaultPrisma,
-    private readonly storage: StorageService = defaultStorage,
+    private readonly storage: StorageProvider = defaultStorageProvider,
   ) {}
 
   async execute(
     fileId: string,
     userId: string,
     userType: 'MEMBER' | 'STAFF' = 'MEMBER',
+    expiresInSeconds?: number,
   ): Promise<DownloadFileResult> {
     const file = await this.prisma.file.findUnique({
       where: { id: fileId },
@@ -52,7 +50,7 @@ export class DownloadFileUseCase {
       }
     }
 
-    const stream = this.storage.getFileInputStream(file.storageKey);
+    const downloadUrl = await this.storage.getSignedDownloadUrl(file.storageKey, expiresInSeconds);
 
     return {
       file: {
@@ -62,7 +60,7 @@ export class DownloadFileUseCase {
         sizeBytes: file.sizeBytes,
         category: file.category,
       },
-      stream,
+      downloadUrl,
     };
   }
 }

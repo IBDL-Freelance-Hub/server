@@ -1,12 +1,11 @@
-import fs from 'fs';
 import { PrismaClient } from '@prisma/client';
 import { DownloadFileUseCase } from '../../../../src/modules/files/application/download-file.usecase';
-import { StorageService } from '../../../../src/modules/files/infrastructure/storage.service';
+import { StorageProvider } from '../../../../src/modules/files/domain/storage-provider.interface';
 import { NotFoundError } from '../../../../src/shared/errors';
 
 describe('DownloadFileUseCase Unit Tests (SEC-32, ERR-98)', () => {
   let mockPrisma: jest.Mocked<PrismaClient>;
-  let mockStorage: jest.Mocked<StorageService>;
+  let mockStorage: jest.Mocked<StorageProvider>;
   let useCase: DownloadFileUseCase;
 
   const mockFileRecord = {
@@ -31,24 +30,22 @@ describe('DownloadFileUseCase Unit Tests (SEC-32, ERR-98)', () => {
     } as unknown as jest.Mocked<PrismaClient>;
 
     mockStorage = {
-      saveFile: jest.fn(),
-      getFileBuffer: jest.fn(),
-      getFileInputStream: jest.fn(),
-      deleteFile: jest.fn(),
-      fileExists: jest.fn(),
-    } as unknown as jest.Mocked<StorageService>;
+      save: jest.fn(),
+      getSignedDownloadUrl: jest.fn(),
+      delete: jest.fn(),
+    };
 
     useCase = new DownloadFileUseCase(mockPrisma, mockStorage);
   });
 
-  it('should successfully allow member to download their own file', async () => {
+  it('should successfully allow member to download their own file with signed URL', async () => {
     (mockPrisma.file.findUnique as jest.Mock).mockResolvedValue(mockFileRecord);
     (mockPrisma.member.findUnique as jest.Mock).mockResolvedValue({
       id: 'member-owner-id',
     });
 
-    const mockStream = {} as fs.ReadStream;
-    mockStorage.getFileInputStream.mockReturnValue(mockStream);
+    const expectedSignedUrl = '/api/v1/files/raw/uuid-secure-key.pdf?expires=12345&sig=abc';
+    mockStorage.getSignedDownloadUrl.mockResolvedValue(expectedSignedUrl);
 
     const result = await useCase.execute('file-doc-123', 'user-owner-id', 'MEMBER');
 
@@ -61,10 +58,10 @@ describe('DownloadFileUseCase Unit Tests (SEC-32, ERR-98)', () => {
       select: { id: true },
     });
 
-    expect(mockStorage.getFileInputStream).toHaveBeenCalledWith('uuid-secure-key.pdf');
+    expect(mockStorage.getSignedDownloadUrl).toHaveBeenCalledWith('uuid-secure-key.pdf', undefined);
     expect(result.file.originalName).toBe('verified-cv.pdf');
     expect(result.file.mimeType).toBe('application/pdf');
-    expect(result.stream).toBe(mockStream);
+    expect(result.downloadUrl).toBe(expectedSignedUrl);
   });
 
   it('should refuse unauthorized member with 404 Not Found (SEC-32, ERR-98 zero-trust)', async () => {
@@ -83,8 +80,8 @@ describe('DownloadFileUseCase Unit Tests (SEC-32, ERR-98)', () => {
       'File not found',
     );
 
-    // Storage stream is NEVER accessed
-    expect(mockStorage.getFileInputStream).not.toHaveBeenCalled();
+    // Storage provider is NEVER accessed when ownership verification fails
+    expect(mockStorage.getSignedDownloadUrl).not.toHaveBeenCalled();
   });
 
   it('should return 404 when file does not exist in database', async () => {
@@ -96,5 +93,6 @@ describe('DownloadFileUseCase Unit Tests (SEC-32, ERR-98)', () => {
     await expect(useCase.execute('non-existent-file', 'user-1', 'MEMBER')).rejects.toThrow(
       'File not found',
     );
+    expect(mockStorage.getSignedDownloadUrl).not.toHaveBeenCalled();
   });
 });

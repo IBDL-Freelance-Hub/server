@@ -1,13 +1,13 @@
 import { PrismaClient } from '@prisma/client';
 import { UploadCvUseCase } from '../../../../src/modules/files/application/upload-cv.usecase';
 import { FileValidatorService } from '../../../../src/modules/files/infrastructure/file-validator.service';
-import { StorageService } from '../../../../src/modules/files/infrastructure/storage.service';
+import { StorageProvider } from '../../../../src/modules/files/domain/storage-provider.interface';
 import { NotFoundError, ValidationError } from '../../../../src/shared/errors';
 
 describe('UploadCvUseCase Unit Tests', () => {
   let mockPrisma: jest.Mocked<PrismaClient>;
   let mockValidator: jest.Mocked<FileValidatorService>;
-  let mockStorage: jest.Mocked<StorageService>;
+  let mockStorage: jest.Mocked<StorageProvider>;
   let useCase: UploadCvUseCase;
 
   const mockDbMember = {
@@ -75,12 +75,10 @@ describe('UploadCvUseCase Unit Tests', () => {
     } as unknown as jest.Mocked<FileValidatorService>;
 
     mockStorage = {
-      saveFile: jest.fn(),
-      getFileBuffer: jest.fn(),
-      getFileInputStream: jest.fn(),
-      deleteFile: jest.fn(),
-      fileExists: jest.fn(),
-    } as unknown as jest.Mocked<StorageService>;
+      save: jest.fn(),
+      getSignedDownloadUrl: jest.fn(),
+      delete: jest.fn(),
+    };
 
     useCase = new UploadCvUseCase(mockPrisma, mockValidator, mockStorage);
   });
@@ -94,7 +92,7 @@ describe('UploadCvUseCase Unit Tests', () => {
       sizeBytes: 2048,
     });
 
-    mockStorage.saveFile.mockResolvedValue('uuid-1234.pdf');
+    mockStorage.save.mockResolvedValue('uuid-1234.pdf');
 
     const result = await useCase.execute(
       'user-1',
@@ -116,8 +114,12 @@ describe('UploadCvUseCase Unit Tests', () => {
       }
     )._mockTx;
 
-    // Verify storage saved with non-guessable key
-    expect(mockStorage.saveFile).toHaveBeenCalledWith(expect.any(Buffer), 'pdf');
+    // Verify storage saved with non-guessable key and mimeType
+    expect(mockStorage.save).toHaveBeenCalledWith(
+      expect.any(Buffer),
+      expect.stringMatching(/^[0-9a-f-]+\.pdf$/),
+      'application/pdf',
+    );
 
     // Verify previous active CVs superseded
     expect(mockTx.file.updateMany).toHaveBeenCalledWith({
@@ -186,7 +188,7 @@ describe('UploadCvUseCase Unit Tests', () => {
     ).rejects.toThrow(ValidationError);
 
     // Database and storage are NEVER touched
-    expect(mockStorage.saveFile).not.toHaveBeenCalled();
+    expect(mockStorage.save).not.toHaveBeenCalled();
     expect(mockPrisma.$transaction).not.toHaveBeenCalled();
     expect(mockPrisma.member.findUnique).not.toHaveBeenCalled();
   });
@@ -200,7 +202,7 @@ describe('UploadCvUseCase Unit Tests', () => {
       sizeBytes: 1024,
     });
 
-    mockStorage.saveFile.mockRejectedValue(new Error('Disk write I/O error'));
+    mockStorage.save.mockRejectedValue(new Error('Disk write I/O error'));
 
     await expect(
       useCase.execute('user-1', {
