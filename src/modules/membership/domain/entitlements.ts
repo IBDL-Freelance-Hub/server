@@ -1,6 +1,7 @@
 import { MembershipTier, MembershipStatus, UserStatus } from '@prisma/client';
 
-export const DIRECTORY_COMPLETION_THRESHOLD = 80;
+// 100% per PRO-34 — do not change without an approved, documented business decision citing its source.
+export const DIRECTORY_COMPLETION_THRESHOLD = 100;
 
 export interface TierBenefits {
   assessmentAccess: {

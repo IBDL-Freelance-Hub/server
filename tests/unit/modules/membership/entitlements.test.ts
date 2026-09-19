@@ -10,7 +10,7 @@ describe('Entitlement Engine & Directory Eligibility (SEC-33, MEM-01 to MEM-06, 
     it('should evaluate isEligible: true only when all 4 conditions are simultaneously met', () => {
       const result = calculateDirectoryEligibility({
         directoryOptIn: true,
-        profileCompletionRate: 80,
+        profileCompletionRate: 100,
         userStatus: UserStatus.ACTIVE,
         membershipStatus: MembershipStatus.ACTIVE,
       });
@@ -45,10 +45,10 @@ describe('Entitlement Engine & Directory Eligibility (SEC-33, MEM-01 to MEM-06, 
       expect(result.reasons).toContain('Directory opt-in is disabled');
     });
 
-    it('should evaluate isEligible: false when profile completion is below threshold (79%)', () => {
+    it('should evaluate isEligible: false when profile completion is below threshold (99%)', () => {
       const result = calculateDirectoryEligibility({
         directoryOptIn: true,
-        profileCompletionRate: 79,
+        profileCompletionRate: 99,
         userStatus: UserStatus.ACTIVE,
         membershipStatus: MembershipStatus.ACTIVE,
       });
@@ -96,15 +96,15 @@ describe('Entitlement Engine & Directory Eligibility (SEC-33, MEM-01 to MEM-06, 
       expect(result.reasons).toHaveLength(4);
     });
 
-    it('should use default completion threshold of 80%', () => {
-      expect(DIRECTORY_COMPLETION_THRESHOLD).toBe(80);
+    it('should use default completion threshold of 100%', () => {
+      expect(DIRECTORY_COMPLETION_THRESHOLD).toBe(100);
     });
   });
 
   describe('Tier Benefits & Entitlements Engine (SEC-33, MEM-01 to MEM-06)', () => {
     const eligibleStatus = calculateDirectoryEligibility({
       directoryOptIn: true,
-      profileCompletionRate: 85,
+      profileCompletionRate: 100,
       userStatus: UserStatus.ACTIVE,
       membershipStatus: MembershipStatus.ACTIVE,
     });
