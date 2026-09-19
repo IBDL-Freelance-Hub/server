@@ -251,6 +251,8 @@ model SecurityConfig {
   tokenRequestWindowMinutesPerIp       Int      @default(60)
   unactivatedRetentionMonths           Int      @default(12)
   unactivatedReminderDaysBeforeCutoff Int      @default(7)
+  singleLineFieldMaxLength            Int      @default(250)
+  multiLineFieldMaxLength             Int      @default(5000)
   updatedAt                            DateTime @updatedAt
   updatedById                          String?
 }

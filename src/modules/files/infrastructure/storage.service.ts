@@ -1,5 +1,6 @@
 import fs from 'fs';
 import path from 'path';
+import os from 'os';
 import crypto from 'crypto';
 import { NotFoundError, ValidationError } from '../../../shared/errors';
 
@@ -7,12 +8,22 @@ export class StorageService {
   private readonly uploadDir: string;
 
   constructor(customUploadDir?: string) {
-    this.uploadDir =
-      customUploadDir || process.env.UPLOAD_DIR || path.resolve(process.cwd(), 'uploads');
+    const isServerless = Boolean(
+      process.env.VERCEL || process.env.AWS_LAMBDA_FUNCTION_NAME || process.env.LAMBDA_TASK_ROOT,
+    );
+    const defaultDir = isServerless
+      ? path.join(os.tmpdir(), 'uploads')
+      : path.resolve(process.cwd(), 'uploads');
 
-    // Ensure uploads directory exists on disk
-    if (!fs.existsSync(this.uploadDir)) {
-      fs.mkdirSync(this.uploadDir, { recursive: true });
+    this.uploadDir = customUploadDir || process.env.UPLOAD_DIR || defaultDir;
+
+    // Ensure uploads directory exists on disk safely
+    try {
+      if (!fs.existsSync(this.uploadDir)) {
+        fs.mkdirSync(this.uploadDir, { recursive: true });
+      }
+    } catch (err) {
+      console.warn('[StorageService] Could not create uploads directory:', err);
     }
   }
 

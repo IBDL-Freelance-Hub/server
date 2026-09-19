@@ -3,6 +3,15 @@ import { emailSchema } from '../../../shared/validation';
 
 export const experienceBands = ['<2', '2-5', '6-10', '11-15', '>15'] as const;
 
+// Configurable length defaults per VAL-08 (5,000 for multi-line fields, 250 for single-line)
+export const DEFAULT_MULTI_LINE_MAX_LENGTH = 5000;
+export const DEFAULT_SINGLE_LINE_MAX_LENGTH = 250;
+
+export const formatBioTooLongMessage = (limit: number, lang: 'en' | 'ar' = 'en') =>
+  lang === 'ar'
+    ? `هذا الإدخال طويل جداً. يرجى تقصيره إلى ${limit} حرفاً أو أقل.`
+    : `This entry is too long. Shorten it to ${limit} characters or fewer.`;
+
 export const registerMemberSchema = z.object({
   fullName: z.string().trim().min(2, 'Full name must be at least 2 characters long'),
   email: emailSchema,
@@ -25,7 +34,14 @@ export const registerMemberSchema = z.object({
   }),
   areasOfExpertise: z.array(z.string()).default([]),
   industriesServed: z.array(z.string()).default([]),
-  bio: z.string().trim().optional(),
+  bio: z
+    .string()
+    .trim()
+    .max(
+      DEFAULT_MULTI_LINE_MAX_LENGTH,
+      formatBioTooLongMessage(DEFAULT_MULTI_LINE_MAX_LENGTH, 'en'),
+    )
+    .optional(),
   message: z.string().trim().optional(),
   cvFileId: z.string().trim().optional(),
   directoryOptIn: z.boolean().default(false),
@@ -99,14 +115,20 @@ export const updateMemberProfileSchema = z
     bioEn: z
       .string()
       .trim()
-      .max(1000, 'English biography cannot exceed 1000 characters (VAL-08)')
+      .max(
+        DEFAULT_MULTI_LINE_MAX_LENGTH,
+        formatBioTooLongMessage(DEFAULT_MULTI_LINE_MAX_LENGTH, 'en'),
+      )
       .transform((val) => (val === '' ? null : val))
       .nullable()
       .optional(),
     bioAr: z
       .string()
       .trim()
-      .max(1000, 'Arabic biography cannot exceed 1000 characters (VAL-08)')
+      .max(
+        DEFAULT_MULTI_LINE_MAX_LENGTH,
+        formatBioTooLongMessage(DEFAULT_MULTI_LINE_MAX_LENGTH, 'ar'),
+      )
       .transform((val) => (val === '' ? null : val))
       .nullable()
       .optional(),

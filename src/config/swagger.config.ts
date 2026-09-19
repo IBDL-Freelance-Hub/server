@@ -182,8 +182,84 @@ const options: swaggerJsdoc.Options = {
                 tierName: { type: 'string', example: 'Professional' },
                 status: { type: 'string', example: 'ACTIVE' },
                 isActive: { type: 'boolean', example: true },
-                benefits: { type: 'object' },
-                directoryEligibility: { type: 'object' },
+                benefits: {
+                  type: 'object',
+                  properties: {
+                    assessmentAccess: {
+                      type: 'object',
+                      properties: {
+                        type: {
+                          type: 'string',
+                          enum: [
+                            'SPECIMEN_DEMO',
+                            'SINGLE_COMPLIMENTARY',
+                            'UNRESTRICTED_SUITE',
+                            'RESTRICTED',
+                          ],
+                          example: 'SINGLE_COMPLIMENTARY',
+                        },
+                        description: { type: 'string' },
+                        discountedRetakes: { type: 'boolean', example: true },
+                        benchmarkReporting: { type: 'boolean', example: false },
+                      },
+                    },
+                    directoryVisibility: {
+                      type: 'object',
+                      properties: {
+                        badge: {
+                          type: 'string',
+                          enum: ['NONE', 'VERIFIED_PROFESSIONAL', 'MASTER'],
+                          example: 'VERIFIED_PROFESSIONAL',
+                        },
+                        featuredListing: { type: 'boolean', example: false },
+                        prioritySearchWeight: { type: 'integer', example: 2 },
+                        listingType: {
+                          type: 'string',
+                          enum: ['NONE', 'BASIC', 'PRIORITY', 'FEATURED'],
+                          example: 'PRIORITY',
+                        },
+                      },
+                    },
+                    discounts: {
+                      type: 'object',
+                      properties: {
+                        platformDiscountPercentage: { type: 'integer', example: 30 },
+                        conciergeReviewAssistance: { type: 'boolean', example: false },
+                        allCoreHubServicesIncluded: { type: 'boolean', example: false },
+                        description: { type: 'string' },
+                      },
+                    },
+                    accreditationsAndCertificates: {
+                      type: 'object',
+                      properties: {
+                        programmeAccreditationsIncluded: { type: 'integer', example: 1 },
+                        freeTraineeCertificates: { type: 'integer', example: 20 },
+                        quarterlyFreeTools: { type: 'integer', example: 0 },
+                        description: { type: 'string' },
+                      },
+                    },
+                  },
+                },
+                directoryEligibility: {
+                  type: 'object',
+                  properties: {
+                    isEligible: { type: 'boolean', example: true },
+                    reasons: { type: 'array', items: { type: 'string' } },
+                    criteria: {
+                      type: 'object',
+                      properties: {
+                        directoryOptIn: { type: 'boolean', example: true },
+                        profileCompletionRate: { type: 'integer', example: 85 },
+                        completionThreshold: { type: 'integer', example: 80 },
+                        hasMetCompletionThreshold: { type: 'boolean', example: true },
+                        membershipStatus: { type: 'string', nullable: true, example: 'ACTIVE' },
+                        userStatus: { type: 'string', example: 'ACTIVE' },
+                        isMembershipActive: { type: 'boolean', example: true },
+                        isUserActive: { type: 'boolean', example: true },
+                      },
+                    },
+                  },
+                },
               },
             },
             profileProgress: {
@@ -198,15 +274,83 @@ const options: swaggerJsdoc.Options = {
               items: {
                 type: 'object',
                 properties: {
+                  text: {
+                    type: 'object',
+                    properties: {
+                      en: { type: 'string', example: 'Profile updated' },
+                      ar: { type: 'string', example: 'تم تحديث الملف الشخصي' },
+                    },
+                  },
+                  date: { type: 'string', format: 'date-time' },
+                  tone: {
+                    type: 'string',
+                    enum: ['positive', 'neutral', 'info'],
+                    example: 'info',
+                  },
+                },
+              },
+            },
+          },
+        },
+        MemberProfileResponse: {
+          type: 'object',
+          properties: {
+            id: { type: 'string', format: 'uuid' },
+            userId: { type: 'string', format: 'uuid' },
+            email: { type: 'string', format: 'email', example: 'john.doe@example.com' },
+            fullNameEn: { type: 'string', example: 'John Doe' },
+            fullNameAr: { type: 'string', nullable: true, example: 'جون دو' },
+            phone: { type: 'string', example: '+201012345678' },
+            country: { type: 'string', example: 'Egypt' },
+            city: { type: 'string', nullable: true, example: 'Cairo' },
+            yearsOfExperience: { type: 'string', example: '6-10' },
+            areasOfExpertise: { type: 'array', items: { type: 'string' } },
+            industriesServed: { type: 'array', items: { type: 'string' } },
+            languages: { type: 'array', items: { type: 'string' } },
+            bioEn: { type: 'string', nullable: true },
+            bioAr: { type: 'string', nullable: true },
+            linkedinUrl: { type: 'string', nullable: true },
+            photoFileId: { type: 'string', nullable: true },
+            directoryOptIn: { type: 'boolean', example: false },
+            profileCompletionRate: { type: 'integer', example: 85 },
+            completionPercentage: { type: 'integer', example: 85 },
+            missingFields: { type: 'array', items: { type: 'string' } },
+            missingItems: { type: 'array', items: { type: 'string' } },
+            membership: {
+              type: 'object',
+              nullable: true,
+              properties: {
+                id: { type: 'string', format: 'uuid' },
+                tier: {
+                  type: 'string',
+                  enum: ['ESSENTIAL', 'PROFESSIONAL', 'MASTER'],
+                  example: 'ESSENTIAL',
+                },
+                status: {
+                  type: 'string',
+                  enum: ['ACTIVE', 'EXPIRED', 'SUSPENDED'],
+                  example: 'ACTIVE',
+                },
+                startDate: { type: 'string', format: 'date-time' },
+                endDate: { type: 'string', format: 'date-time', nullable: true },
+              },
+            },
+            files: {
+              type: 'array',
+              items: {
+                type: 'object',
+                properties: {
                   id: { type: 'string', format: 'uuid' },
-                  action: { type: 'string', example: 'MEMBER_REGISTERED' },
-                  resource: { type: 'string', example: 'Member' },
-                  resourceId: { type: 'string', nullable: true },
-                  reason: { type: 'string', nullable: true },
+                  category: { type: 'string', example: 'CV' },
+                  originalName: { type: 'string', example: 'resume.pdf' },
+                  sizeBytes: { type: 'integer', example: 1048576 },
+                  mimeType: { type: 'string', example: 'application/pdf' },
                   createdAt: { type: 'string', format: 'date-time' },
                 },
               },
             },
+            createdAt: { type: 'string', format: 'date-time' },
+            updatedAt: { type: 'string', format: 'date-time' },
           },
         },
         UpgradeMembershipRequest: {
@@ -498,6 +642,17 @@ const options: swaggerJsdoc.Options = {
           responses: {
             '200': {
               description: 'Profile retrieved successfully',
+              content: {
+                'application/json': {
+                  schema: {
+                    type: 'object',
+                    properties: {
+                      success: { type: 'boolean', example: true },
+                      data: { $ref: '#/components/schemas/MemberProfileResponse' },
+                    },
+                  },
+                },
+              },
             },
             '401': {
               description: 'Unauthorized / invalid session',

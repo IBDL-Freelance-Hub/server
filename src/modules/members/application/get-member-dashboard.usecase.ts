@@ -1,21 +1,18 @@
 import { PrismaClient, MembershipTier, MembershipStatus } from '@prisma/client';
 import { prisma as defaultPrisma } from '../../../shared/providers';
 import { NotFoundError } from '../../../shared/errors';
-import { calculateProfileCompletion } from '../domain';
+import {
+  calculateProfileCompletion,
+  mapAuditLogToMemberActivity,
+  MemberActivityItem,
+} from '../domain';
 import {
   calculateEntitlements,
   calculateDirectoryEligibility,
   MemberEntitlements,
 } from '../../membership/domain';
 
-export interface ActivityItem {
-  id: string;
-  action: string;
-  resource: string;
-  resourceId: string | null;
-  reason: string | null;
-  createdAt: Date;
-}
+export { MemberActivityItem };
 
 export interface MemberDashboardResult {
   member: {
@@ -40,7 +37,7 @@ export interface MemberDashboardResult {
     completionPercentage: number;
     missingFields: string[];
   };
-  recentActivity: ActivityItem[];
+  recentActivity: MemberActivityItem[];
 }
 
 export class GetMemberDashboardUseCase {
@@ -123,30 +120,31 @@ export class GetMemberDashboardUseCase {
 
     const entitlements = calculateEntitlements(tier, status, directoryEligibility);
 
-    // 4. Fetch recent activity feed (SEC-33)
-    // CRITICAL: Strictly project fields and omit `sequenceNumber` (BigInt) to prevent JSON serialization crash
+    // 4. Fetch recent activity feed (ACT-58, SEC-33)
+    // Filter strictly to requesting member's userId (actorId === member.userId).
+    // Audit-only fields (resource, resourceId, reason, actorRole, previousState, newState) are never selected.
     const recentLogs = await this.prisma.auditLog.findMany({
       where: { actorId: member.userId },
       orderBy: { createdAt: 'desc' },
-      take: 10,
+      take: 20,
       select: {
-        id: true,
         action: true,
-        resource: true,
-        resourceId: true,
-        reason: true,
         createdAt: true,
       },
     });
 
-    const recentActivity: ActivityItem[] = recentLogs.map((log) => ({
-      id: log.id,
-      action: log.action,
-      resource: log.resource,
-      resourceId: log.resourceId,
-      reason: log.reason,
-      createdAt: log.createdAt,
-    }));
+    // Map known action codes to bilingual human-readable sentences and tone.
+    // Unmapped codes are silently excluded. Capped at the 5 most recent entries.
+    const recentActivity: MemberActivityItem[] = [];
+    for (const log of recentLogs) {
+      const mapped = mapAuditLogToMemberActivity(log.action, log.createdAt);
+      if (mapped) {
+        recentActivity.push(mapped);
+        if (recentActivity.length === 5) {
+          break;
+        }
+      }
+    }
 
     const photoUrl = member.photoFileId ? `/api/v1/files/${member.photoFileId}/download` : null;
 

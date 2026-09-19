@@ -215,25 +215,27 @@ describe('Member Registration Zod Schema Unit Tests', () => {
       expect(res.success).toBe(false);
     });
 
-    it('should reject bioEn or bioAr exceeding 1000 characters (VAL-08)', () => {
-      const longBio = 'a'.repeat(1001);
+    it('should reject bioEn or bioAr exceeding 5000 characters (VAL-08)', () => {
+      const longBio = 'a'.repeat(5001);
       const resEn = updateMemberProfileSchema.safeParse({ bioEn: longBio });
       expect(resEn.success).toBe(false);
       if (!resEn.success) {
         const issue = resEn.error.issues.find((i) => i.path.join('.') === 'bioEn');
-        expect(issue?.message).toBe('English biography cannot exceed 1000 characters (VAL-08)');
+        expect(issue?.message).toBe(
+          'This entry is too long. Shorten it to 5000 characters or fewer.',
+        );
       }
 
       const resAr = updateMemberProfileSchema.safeParse({ bioAr: longBio });
       expect(resAr.success).toBe(false);
       if (!resAr.success) {
         const issue = resAr.error.issues.find((i) => i.path.join('.') === 'bioAr');
-        expect(issue?.message).toBe('Arabic biography cannot exceed 1000 characters (VAL-08)');
+        expect(issue?.message).toBe('هذا الإدخال طويل جداً. يرجى تقصيره إلى 5000 حرفاً أو أقل.');
       }
     });
 
-    it('should accept valid 1000 character bio (VAL-08)', () => {
-      const validBio = 'a'.repeat(1000);
+    it('should accept valid 5000 character bio (VAL-08)', () => {
+      const validBio = 'a'.repeat(5000);
       const res = updateMemberProfileSchema.safeParse({ bioEn: validBio, bioAr: validBio });
       expect(res.success).toBe(true);
     });

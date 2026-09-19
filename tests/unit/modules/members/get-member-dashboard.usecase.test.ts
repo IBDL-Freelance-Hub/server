@@ -122,23 +122,27 @@ describe('GetMemberDashboardUseCase Unit Tests (SEC-33, MEM-01 to MEM-12, PRO-13
     // 4. Profile progress
     expect(result.profileProgress.completionPercentage).toBeGreaterThanOrEqual(80);
 
-    // 5. Recent activity without BigInt serialization issue
+    // 5. Recent activity adheres strictly to ACT-58
     expect(result.recentActivity).toHaveLength(2);
-    expect(result.recentActivity[0]?.action).toBe('MEMBER_PROFILE_UPDATED');
+    expect(result.recentActivity[0]?.text.en).toBe('Profile updated');
+    expect(result.recentActivity[0]?.text.ar).toBe('تم تحديث الملف الشخصي');
+    expect(result.recentActivity[0]?.tone).toBe('info');
+    expect(
+      (result.recentActivity[0] as unknown as Record<string, unknown>).resource,
+    ).toBeUndefined();
+    expect((result.recentActivity[0] as unknown as Record<string, unknown>).action).toBeUndefined();
+    expect((result.recentActivity[0] as unknown as Record<string, unknown>).reason).toBeUndefined();
+
     // Ensure payload can be JSON-stringified without throwing BigInt TypeError
     expect(() => JSON.stringify(result)).not.toThrow();
 
-    // Verify DB call strictly omits BigInt sequenceNumber
+    // Verify DB call strictly queries actorId === requesting member and omits raw audit fields
     expect(mockPrisma.auditLog.findMany).toHaveBeenCalledWith({
       where: { actorId: 'user-uuid-1' },
       orderBy: { createdAt: 'desc' },
-      take: 10,
+      take: 20,
       select: {
-        id: true,
         action: true,
-        resource: true,
-        resourceId: true,
-        reason: true,
         createdAt: true,
       },
     });
@@ -201,5 +205,57 @@ describe('GetMemberDashboardUseCase Unit Tests (SEC-33, MEM-01 to MEM-12, PRO-13
     expect(result.entitlements.isActive).toBe(false);
     expect(result.entitlements.benefits.discounts.platformDiscountPercentage).toBe(0);
     expect(result.entitlements.directoryEligibility.isEligible).toBe(false);
+  });
+
+  it('should query strictly by requesting member actorId, silently exclude unmapped action codes, and cap at 5 entries (ACT-58)', async () => {
+    const mixedLogs = [
+      { action: 'MEMBER_REGISTERED', createdAt: new Date('2026-01-01T10:00:00Z') },
+      { action: 'UNKNOWN_ADMIN_OVERRIDE', createdAt: new Date('2026-01-01T11:00:00Z') }, // Unmapped -> must be excluded
+      { action: 'PROFILE_UPDATED', createdAt: new Date('2026-01-01T12:00:00Z') },
+      { action: 'INTERNAL_SECURITY_CHECK', createdAt: new Date('2026-01-01T13:00:00Z') }, // Unmapped -> must be excluded
+      { action: 'CV_UPLOADED', createdAt: new Date('2026-01-01T14:00:00Z') },
+      { action: 'PHOTO_UPLOADED', createdAt: new Date('2026-01-01T15:00:00Z') },
+      { action: 'MEMBERSHIP_UPGRADED', createdAt: new Date('2026-01-01T16:00:00Z') },
+      { action: 'PASSWORD_CHANGED', createdAt: new Date('2026-01-01T17:00:00Z') }, // 6th mapped item -> must be capped at 5
+    ];
+
+    (mockPrisma.member.findUnique as jest.Mock).mockResolvedValue(mockMember);
+    (mockPrisma.auditLog.findMany as jest.Mock).mockResolvedValue(mixedLogs);
+
+    const result = await useCase.execute('user-uuid-1');
+
+    // 1. Verify DB query strictly queries the requesting member's userId
+    expect(mockPrisma.auditLog.findMany).toHaveBeenCalledWith({
+      where: { actorId: 'user-uuid-1' },
+      orderBy: { createdAt: 'desc' },
+      take: 20,
+      select: {
+        action: true,
+        createdAt: true,
+      },
+    });
+
+    // 2. Exactly capped at 5 entries
+    expect(result.recentActivity).toHaveLength(5);
+
+    // 3. Unmapped codes are silently excluded
+    const textCorpus = result.recentActivity.map((a) => `${a.text.en} ${a.text.ar}`).join(' ');
+    expect(textCorpus).not.toContain('UNKNOWN');
+    expect(textCorpus).not.toContain('INTERNAL');
+
+    // 4. Returned items contain ONLY { text: { en, ar }, date, tone }
+    for (const item of result.recentActivity) {
+      expect(item).toHaveProperty('text.en');
+      expect(item).toHaveProperty('text.ar');
+      expect(item).toHaveProperty('date');
+      expect(item).toHaveProperty('tone');
+      expect((item as unknown as Record<string, unknown>).resource).toBeUndefined();
+      expect((item as unknown as Record<string, unknown>).resourceId).toBeUndefined();
+      expect((item as unknown as Record<string, unknown>).reason).toBeUndefined();
+      expect((item as unknown as Record<string, unknown>).action).toBeUndefined();
+      expect((item as unknown as Record<string, unknown>).actorRole).toBeUndefined();
+      expect((item as unknown as Record<string, unknown>).previousState).toBeUndefined();
+      expect((item as unknown as Record<string, unknown>).newState).toBeUndefined();
+    }
   });
 });

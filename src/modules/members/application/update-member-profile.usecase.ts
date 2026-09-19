@@ -2,7 +2,11 @@ import { PrismaClient } from '@prisma/client';
 import { prisma as defaultPrisma } from '../../../shared/providers';
 import { ConflictError, NotFoundError, ValidationError } from '../../../shared/errors';
 import { calculateProfileCompletion, normalizePhoneNumber } from '../domain';
-import { UpdateMemberProfileInput } from '../presentation/members.schema';
+import {
+  UpdateMemberProfileInput,
+  DEFAULT_MULTI_LINE_MAX_LENGTH,
+  formatBioTooLongMessage,
+} from '../presentation/members.schema';
 
 export interface UpdateMemberProfileContext {
   requestId?: string;
@@ -39,6 +43,29 @@ export class UpdateMemberProfileUseCase {
       (!input.yearsOfExperience || !input.yearsOfExperience.trim())
     ) {
       throw new ValidationError('Years of experience cannot be empty or null (VAL-57)');
+    }
+
+    // 2.1 Dynamic SecurityConfig multi-line length enforcement (VAL-08)
+    let maxBioLength = DEFAULT_MULTI_LINE_MAX_LENGTH;
+    try {
+      const securityConfig = await this.prisma.securityConfig.findFirst({ where: { id: 1 } });
+      if (securityConfig?.multiLineFieldMaxLength) {
+        maxBioLength = securityConfig.multiLineFieldMaxLength;
+      }
+    } catch {
+      // Graceful fallback to 5,000 characters if configuration record is not yet seeded or temporarily unavailable
+      maxBioLength = DEFAULT_MULTI_LINE_MAX_LENGTH;
+    }
+
+    if (input.bioEn && input.bioEn.length > maxBioLength) {
+      throw new ValidationError(formatBioTooLongMessage(maxBioLength, 'en'), [
+        { field: 'bioEn', message: formatBioTooLongMessage(maxBioLength, 'en') },
+      ]);
+    }
+    if (input.bioAr && input.bioAr.length > maxBioLength) {
+      throw new ValidationError(formatBioTooLongMessage(maxBioLength, 'ar'), [
+        { field: 'bioAr', message: formatBioTooLongMessage(maxBioLength, 'ar') },
+      ]);
     }
 
     // 3. Find existing member

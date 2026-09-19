@@ -70,6 +70,9 @@ describe('UpdateMemberProfileUseCase Unit Tests', () => {
         findUnique: jest.fn(),
         findFirst: jest.fn(),
       },
+      securityConfig: {
+        findFirst: jest.fn(),
+      },
       $transaction: jest.fn().mockImplementation(async (callback) => {
         return callback(mockTx);
       }),
@@ -284,5 +287,69 @@ describe('UpdateMemberProfileUseCase Unit Tests', () => {
     (mockPrisma.member.findUnique as jest.Mock).mockResolvedValue(null);
 
     await expect(useCase.execute('unknown-user', { city: 'Cairo' })).rejects.toThrow(NotFoundError);
+  });
+
+  it('should enforce VAL-08 default max bio length (5000 characters) when securityConfig has default', async () => {
+    (mockPrisma.member.findUnique as jest.Mock).mockResolvedValue(mockDbMember);
+    (mockPrisma.securityConfig.findFirst as jest.Mock).mockResolvedValue({
+      multiLineFieldMaxLength: 5000,
+    });
+
+    const longBio = 'a'.repeat(5001);
+
+    await expect(
+      useCase.execute('user-uuid-1', {
+        bioEn: longBio,
+      }),
+    ).rejects.toThrow('This entry is too long. Shorten it to 5000 characters or fewer.');
+
+    await expect(
+      useCase.execute('user-uuid-1', {
+        bioAr: longBio,
+      }),
+    ).rejects.toThrow('هذا الإدخال طويل جداً. يرجى تقصيره إلى 5000 حرفاً أو أقل.');
+  });
+
+  it('should enforce dynamically configured max bio length from SecurityConfig (VAL-08)', async () => {
+    (mockPrisma.member.findUnique as jest.Mock).mockResolvedValue(mockDbMember);
+    (mockPrisma.securityConfig.findFirst as jest.Mock).mockResolvedValue({
+      multiLineFieldMaxLength: 2000,
+    });
+
+    const bio2001 = 'a'.repeat(2001);
+
+    await expect(
+      useCase.execute('user-uuid-1', {
+        bioEn: bio2001,
+      }),
+    ).rejects.toThrow('This entry is too long. Shorten it to 2000 characters or fewer.');
+  });
+
+  it('should gracefully fallback to 5000 characters when SecurityConfig is not yet seeded (VAL-08)', async () => {
+    (mockPrisma.member.findUnique as jest.Mock).mockResolvedValue(mockDbMember);
+    (mockPrisma.securityConfig.findFirst as jest.Mock).mockResolvedValue(null);
+
+    const bio5001 = 'a'.repeat(5001);
+
+    await expect(
+      useCase.execute('user-uuid-1', {
+        bioEn: bio5001,
+      }),
+    ).rejects.toThrow('This entry is too long. Shorten it to 5000 characters or fewer.');
+  });
+
+  it('should gracefully fallback to 5000 characters when SecurityConfig query fails or is temporarily unavailable (VAL-08)', async () => {
+    (mockPrisma.member.findUnique as jest.Mock).mockResolvedValue(mockDbMember);
+    (mockPrisma.securityConfig.findFirst as jest.Mock).mockRejectedValue(
+      new Error('Database temporarily unavailable'),
+    );
+
+    const bio5001 = 'a'.repeat(5001);
+
+    await expect(
+      useCase.execute('user-uuid-1', {
+        bioEn: bio5001,
+      }),
+    ).rejects.toThrow('This entry is too long. Shorten it to 5000 characters or fewer.');
   });
 });
