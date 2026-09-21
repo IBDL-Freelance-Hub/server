@@ -2,6 +2,7 @@ import { Request, Response, NextFunction } from 'express';
 import { FilesController } from '../../../../src/modules/files/presentation/files.controller';
 import { UploadCvUseCase } from '../../../../src/modules/files/application/upload-cv.usecase';
 import { UploadProfilePhotoUseCase } from '../../../../src/modules/files/application/upload-profile-photo.usecase';
+import { DeleteProfilePhotoUseCase } from '../../../../src/modules/files/application/delete-profile-photo.usecase';
 import { DownloadFileUseCase } from '../../../../src/modules/files/application/download-file.usecase';
 import { LocalDiskStorageProvider } from '../../../../src/modules/files/infrastructure/local-disk-storage.provider';
 import * as storageFactory from '../../../../src/modules/files/infrastructure/storage-provider.factory';
@@ -11,6 +12,7 @@ describe('FilesController Unit Tests', () => {
   let controller: FilesController;
   let mockUploadCvUseCase: jest.Mocked<UploadCvUseCase>;
   let mockUploadProfilePhotoUseCase: jest.Mocked<UploadProfilePhotoUseCase>;
+  let mockDeleteProfilePhotoUseCase: jest.Mocked<DeleteProfilePhotoUseCase>;
   let mockDownloadFileUseCase: jest.Mocked<DownloadFileUseCase>;
   let mockReq: Partial<Request>;
   let mockRes: Partial<Response>;
@@ -25,6 +27,10 @@ describe('FilesController Unit Tests', () => {
       execute: jest.fn(),
     } as unknown as jest.Mocked<UploadProfilePhotoUseCase>;
 
+    mockDeleteProfilePhotoUseCase = {
+      execute: jest.fn(),
+    } as unknown as jest.Mocked<DeleteProfilePhotoUseCase>;
+
     mockDownloadFileUseCase = {
       execute: jest.fn(),
     } as unknown as jest.Mocked<DownloadFileUseCase>;
@@ -32,6 +38,7 @@ describe('FilesController Unit Tests', () => {
     controller = new FilesController(
       mockUploadCvUseCase,
       mockUploadProfilePhotoUseCase,
+      mockDeleteProfilePhotoUseCase,
       mockDownloadFileUseCase,
     );
 
@@ -204,6 +211,42 @@ describe('FilesController Unit Tests', () => {
       );
 
       expect(mockNext).toHaveBeenCalledWith(expect.any(ValidationError));
+    });
+  });
+
+  describe('deleteProfilePhoto', () => {
+    it('should successfully delete profile photo and return 200', async () => {
+      mockReq = {
+        user: { id: 'user-1', email: 'test@example.com', userType: 'MEMBER', status: 'ACTIVE' },
+        id: 'req-123',
+        headers: {},
+        ip: '127.0.0.1',
+      };
+
+      mockDeleteProfilePhotoUseCase.execute.mockResolvedValue({
+        success: true,
+        message: 'Profile photo removed successfully',
+      });
+
+      await controller.deleteProfilePhoto(mockReq as Request, mockRes as Response, mockNext);
+
+      expect(mockDeleteProfilePhotoUseCase.execute).toHaveBeenCalledWith(
+        'user-1',
+        expect.objectContaining({ requestId: 'req-123' }),
+      );
+      expect(mockRes.status).toHaveBeenCalledWith(200);
+      expect(mockRes.json).toHaveBeenCalledWith({
+        success: true,
+        message: 'Profile photo removed successfully',
+      });
+    });
+
+    it('should forward AuthenticationError if user is not logged in', async () => {
+      mockReq = { user: undefined };
+
+      await controller.deleteProfilePhoto(mockReq as Request, mockRes as Response, mockNext);
+
+      expect(mockNext).toHaveBeenCalledWith(expect.any(AuthenticationError));
     });
   });
 });

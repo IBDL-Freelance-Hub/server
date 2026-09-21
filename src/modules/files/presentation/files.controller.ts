@@ -1,6 +1,7 @@
 import { Request, Response, NextFunction } from 'express';
 import { UploadCvUseCase } from '../application/upload-cv.usecase';
 import { UploadProfilePhotoUseCase } from '../application/upload-profile-photo.usecase';
+import { DeleteProfilePhotoUseCase } from '../application/delete-profile-photo.usecase';
 import { DownloadFileUseCase } from '../application/download-file.usecase';
 import { AuthenticationError, ValidationError } from '../../../shared/errors';
 import { getClientIp } from '../../../shared/utils';
@@ -11,6 +12,7 @@ export class FilesController {
   constructor(
     private readonly uploadCvUseCase: UploadCvUseCase = new UploadCvUseCase(),
     private readonly uploadProfilePhotoUseCase: UploadProfilePhotoUseCase = new UploadProfilePhotoUseCase(),
+    private readonly deleteProfilePhotoUseCase: DeleteProfilePhotoUseCase = new DeleteProfilePhotoUseCase(),
     private readonly downloadFileUseCase: DownloadFileUseCase = new DownloadFileUseCase(),
   ) {}
 
@@ -75,6 +77,24 @@ export class FilesController {
         success: true,
         data: result,
       });
+    } catch (error) {
+      next(error);
+    }
+  };
+
+  deleteProfilePhoto = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+    try {
+      if (!req.user) {
+        throw new AuthenticationError('Your session has ended. Please sign in again.');
+      }
+
+      const clientIp = getClientIp(req);
+      const result = await this.deleteProfilePhotoUseCase.execute(req.user.id, {
+        ipAddress: clientIp,
+        requestId: req.id,
+      });
+
+      res.status(200).json(result);
     } catch (error) {
       next(error);
     }

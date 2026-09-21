@@ -19,6 +19,7 @@ const upload = multer({
 // Protected File Endpoints (requireAuth)
 router.post('/cv', requireAuth, upload.single('file'), controller.uploadCv);
 router.post('/photo', requireAuth, upload.single('file'), controller.uploadProfilePhoto);
+router.delete('/photo', requireAuth, controller.deleteProfilePhoto);
 router.get('/:fileId/download', requireAuth, controller.downloadFile);
 
 // Development/Testing Only Route: Exclusively registered when STORAGE_PROVIDER === 'local'
