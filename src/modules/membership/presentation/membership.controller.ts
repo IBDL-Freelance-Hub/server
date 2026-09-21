@@ -40,10 +40,10 @@ export class MembershipController {
         ipAddress: clientIp,
       });
 
-      // PAY-05, MEM-14: If payment was declined, return HTTP 402 Payment Required
+      // PAY-05, MEM-14, BRU-67, MEM-52: If payment was declined, return HTTP 402 Payment Required
       if (result.paymentStatus === 'DECLINED') {
         res.status(402).json({
-          success: false,
+          success: true,
           message: result.message,
           data: result,
         });

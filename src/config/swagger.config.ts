@@ -398,9 +398,91 @@ const options: swaggerJsdoc.Options = {
                     price: { type: 'number', example: 180.0 },
                   },
                 },
+                outstandingUpgradeAttempt: {
+                  type: 'object',
+                  nullable: true,
+                  properties: {
+                    targetTier: { type: 'string', example: 'PROFESSIONAL' },
+                    state: { type: 'string', enum: ['declined', 'pending'], example: 'declined' },
+                    transactionRef: { type: 'string', example: 'txn_123456789' },
+                  },
+                },
                 message: {
                   type: 'string',
                   example: 'Successfully upgraded to PROFESSIONAL membership.',
+                },
+              },
+            },
+          },
+        },
+        DeclinedUpgradeResponse: {
+          type: 'object',
+          properties: {
+            success: { type: 'boolean', example: true },
+            message: {
+              type: 'string',
+              example:
+                'Payment transaction was declined. Your active membership remains unchanged and unaffected.',
+            },
+            data: {
+              type: 'object',
+              properties: {
+                paymentStatus: {
+                  type: 'string',
+                  enum: ['DECLINED'],
+                  example: 'DECLINED',
+                },
+                transactionId: {
+                  type: 'string',
+                  example: 'txn_9f8c12a4-5678-4abc-def0-123456789abc',
+                },
+                failureReason: {
+                  type: 'string',
+                  example:
+                    'Payment transaction was declined by the issuing bank (insufficient funds or fraud check).',
+                },
+                membership: {
+                  type: 'object',
+                  description:
+                    'Unchanged membership reflecting the member previous active tier (BRU-67, MEM-52)',
+                  properties: {
+                    id: {
+                      type: 'string',
+                      format: 'uuid',
+                      example: 'd3b07384-d113-4678-a6ba-0d862804ec6d',
+                    },
+                    tier: { type: 'string', example: 'ESSENTIAL' },
+                    status: { type: 'string', example: 'ACTIVE' },
+                    startDate: {
+                      type: 'string',
+                      format: 'date-time',
+                      example: '2026-01-01T00:00:00.000Z',
+                    },
+                    endDate: {
+                      type: 'string',
+                      format: 'date-time',
+                      example: '2027-01-01T00:00:00.000Z',
+                    },
+                    price: { type: 'number', example: 0.0 },
+                  },
+                },
+                outstandingUpgradeAttempt: {
+                  type: 'object',
+                  description:
+                    'Audit record of the declined upgrade attempt stored separately from membership (MEM-52c)',
+                  properties: {
+                    targetTier: { type: 'string', example: 'PROFESSIONAL' },
+                    state: { type: 'string', example: 'declined' },
+                    transactionRef: {
+                      type: 'string',
+                      example: 'txn_9f8c12a4-5678-4abc-def0-123456789abc',
+                    },
+                  },
+                },
+                message: {
+                  type: 'string',
+                  example:
+                    'Payment transaction was declined. Your active membership remains unchanged and unaffected.',
                 },
               },
             },
@@ -750,10 +832,11 @@ const options: swaggerJsdoc.Options = {
               description: 'Unauthorized / invalid session',
             },
             '402': {
-              description: 'Payment transaction was declined by the issuer (PAY-05, MEM-14)',
+              description:
+                'Payment transaction was declined by the issuer (BRU-67, MEM-52, PAY-05, MEM-14)',
               content: {
                 'application/json': {
-                  schema: { $ref: '#/components/schemas/UpgradeMembershipResponse' },
+                  schema: { $ref: '#/components/schemas/DeclinedUpgradeResponse' },
                 },
               },
             },

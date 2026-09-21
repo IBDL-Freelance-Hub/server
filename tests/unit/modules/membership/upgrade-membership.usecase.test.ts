@@ -144,8 +144,8 @@ describe('UpgradeMembershipUseCase Unit Tests (MEM-07 to MEM-18, PAY-01 to PAY-1
     });
   });
 
-  describe('Resilient Membership Rule on Declined Payments (PAY-05, MEM-14)', () => {
-    it('should preserve active membership untouched when payment is DECLINED', async () => {
+  describe('Resilient Membership Rule on Declined Payments (BRU-67, MEM-52, PAY-05, MEM-14)', () => {
+    it('should preserve active membership untouched and return distinct outstandingUpgradeAttempt with success: true when payment is DECLINED', async () => {
       (mockPrisma.member.findUnique as jest.Mock).mockResolvedValue(mockMember);
       (mockPrisma.auditLog.create as jest.Mock).mockResolvedValue({ id: 'audit-declined' });
 
@@ -154,21 +154,30 @@ describe('UpgradeMembershipUseCase Unit Tests (MEM-07 to MEM-18, PAY-01 to PAY-1
         simulationOutcome: 'FAIL',
       });
 
-      // 1. Return failure payload
-      expect(result.success).toBe(false);
+      // 1. Return API success: true with paymentStatus DECLINED (BRU-67 / MEM-52: don't conflate API success with payment failure)
+      expect(result.success).toBe(true);
       expect(result.paymentStatus).toBe('DECLINED');
-      expect(result.failureReason).toBeDefined();
+      expect(result.failureReason).toBe(
+        'Payment transaction was declined by the issuing bank (insufficient funds or fraud check).',
+      );
       expect(result.transactionId).toMatch(/^txn_/);
 
-      // 2. Untouched membership returned in payload
+      // 2. Untouched membership returned in payload reflecting PREVIOUS tier (MEM-52)
       expect(result.membership?.tier).toBe(MembershipTier.ESSENTIAL);
       expect(result.membership?.status).toBe(MembershipStatus.ACTIVE);
 
-      // 3. CRITICAL: Database membership record was NOT updated or deleted
+      // 3. Distinct outstandingUpgradeAttempt object recorded separately from membership (MEM-52c)
+      expect(result.outstandingUpgradeAttempt).toEqual({
+        targetTier: MembershipTier.PROFESSIONAL,
+        state: 'declined',
+        transactionRef: result.transactionId,
+      });
+
+      // 4. CRITICAL: Database membership record was NOT updated or deleted
       expect(mockPrisma.membership.update).not.toHaveBeenCalled();
       expect(mockPrisma.membership.create).not.toHaveBeenCalled();
 
-      // 4. AuditLog records PAYMENT_DECLINED
+      // 5. AuditLog records PAYMENT_DECLINED
       expect(mockPrisma.auditLog.create).toHaveBeenCalledWith({
         data: expect.objectContaining({
           actorId: 'user-uuid-1',
@@ -192,6 +201,11 @@ describe('UpgradeMembershipUseCase Unit Tests (MEM-07 to MEM-18, PAY-01 to PAY-1
       expect(result.success).toBe(true);
       expect(result.paymentStatus).toBe('PENDING');
       expect(result.membership?.tier).toBe(MembershipTier.ESSENTIAL);
+      expect(result.outstandingUpgradeAttempt).toEqual({
+        targetTier: MembershipTier.PROFESSIONAL,
+        state: 'pending',
+        transactionRef: result.transactionId,
+      });
       expect(mockPrisma.membership.update).not.toHaveBeenCalled();
       expect(mockPrisma.auditLog.create).toHaveBeenCalledWith({
         data: expect.objectContaining({

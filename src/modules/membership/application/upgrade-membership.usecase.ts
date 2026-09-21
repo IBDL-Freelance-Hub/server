@@ -28,12 +28,19 @@ export interface MembershipRecordDto {
   price: number;
 }
 
+export interface OutstandingUpgradeAttemptDto {
+  targetTier: MembershipTier;
+  state: 'declined' | 'pending';
+  transactionRef: string;
+}
+
 export interface UpgradeMembershipResult {
   success: boolean;
   paymentStatus: PaymentSimulationStatus;
   transactionId: string;
   failureReason?: string;
   membership?: MembershipRecordDto;
+  outstandingUpgradeAttempt?: OutstandingUpgradeAttemptDto;
   message: string;
 }
 
@@ -114,7 +121,7 @@ export class UpgradeMembershipUseCase {
       });
 
       return {
-        success: false,
+        success: true,
         paymentStatus: 'DECLINED',
         transactionId: paymentResult.transactionId,
         failureReason:
@@ -129,6 +136,11 @@ export class UpgradeMembershipUseCase {
               price: Number(currentMembership.price),
             }
           : undefined,
+        outstandingUpgradeAttempt: {
+          targetTier: input.targetTier,
+          state: 'declined',
+          transactionRef: paymentResult.transactionId,
+        },
         message:
           'Payment transaction was declined. Your active membership remains unchanged and unaffected.',
       };
@@ -168,6 +180,11 @@ export class UpgradeMembershipUseCase {
               price: Number(currentMembership.price),
             }
           : undefined,
+        outstandingUpgradeAttempt: {
+          targetTier: input.targetTier,
+          state: 'pending',
+          transactionRef: paymentResult.transactionId,
+        },
         message:
           'Payment is pending. Your current membership benefits remain active and unchanged.',
       };
