@@ -24,7 +24,7 @@ router.get('/:fileId/download', requireAuth, controller.downloadFile);
 
 // Development/Testing Only Route: Exclusively registered when STORAGE_PROVIDER === 'local'
 if (env.STORAGE_PROVIDER === 'local') {
-  router.get('/raw/:storageKey', controller.serveRawLocalFile);
+  router.get(['/raw/:storageKey', '/raw/*'], controller.serveRawLocalFile);
 }
 
 export const filesRouter = router;

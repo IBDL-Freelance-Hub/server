@@ -98,7 +98,7 @@ describe('UploadProfilePhotoUseCase Unit Tests', () => {
     // Verify storage saved with non-guessable key
     expect(mockStorage.save).toHaveBeenCalledWith(
       expect.any(Buffer),
-      expect.stringMatching(/^[0-9a-f-]+\.png$/),
+      expect.stringMatching(/^profiles\/[0-9a-f-]+\.png$/),
       'image/png',
     );
 

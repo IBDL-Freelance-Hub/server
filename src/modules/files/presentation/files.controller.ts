@@ -144,7 +144,8 @@ export class FilesController {
     next: NextFunction,
   ): Promise<void> => {
     try {
-      const { storageKey } = req.params;
+      const storageKey =
+        req.params.storageKey || (req.params as unknown as Record<number, string>)[0];
       const { expires, sig } = req.query;
 
       if (!storageKey || !expires || !sig) {

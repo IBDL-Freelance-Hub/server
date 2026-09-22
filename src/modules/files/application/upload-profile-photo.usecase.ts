@@ -45,8 +45,8 @@ export class UploadProfilePhotoUseCase {
       throw new NotFoundError('Member profile not found');
     }
 
-    // 3. Persist file to storage with randomized UUID name (UPL-05)
-    const key = `${crypto.randomUUID()}.${validated.extension}`;
+    // 3. Persist file to storage with randomized UUID name under profiles/ directory
+    const key = `profiles/${crypto.randomUUID()}.${validated.extension}`;
     const storageKey = await this.storage.save(fileInput.buffer, key, validated.mimeType);
 
     // 4. Atomic Transaction: Supersede old photos, save new record, update Member.photoFileId, and log audit

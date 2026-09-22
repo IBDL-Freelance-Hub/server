@@ -132,16 +132,18 @@ export class LocalDiskStorageProvider implements StorageProvider {
       .digest('hex');
   }
 
-  /**
-   * Resolves a storageKey safely within uploadDir to prevent path traversal (UPL-05).
-   */
   private resolveSafePath(storageKey: string): string {
-    const sanitizedKey = path.basename(storageKey);
-    const resolvedPath = path.resolve(this.uploadDir, sanitizedKey);
+    const normalizedKey = path.normalize(storageKey).replace(/^(\.\.[/\\])+/, '');
+    const resolvedPath = path.resolve(this.uploadDir, normalizedKey);
 
     // Guard against directory traversal attacks
     if (!resolvedPath.startsWith(this.uploadDir)) {
       throw new ValidationError('Invalid storage key: path traversal detected');
+    }
+
+    const dir = path.dirname(resolvedPath);
+    if (!fs.existsSync(dir)) {
+      fs.mkdirSync(dir, { recursive: true });
     }
 
     return resolvedPath;

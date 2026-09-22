@@ -53,9 +53,9 @@ export class UploadCvUseCase {
       throw new NotFoundError('Member profile not found');
     }
 
-    // 3. Persist file to storage with randomized UUID name (UPL-05)
+    // 3. Persist file to storage with randomized UUID name under cv/ directory
     // If storage fails, existing CV remains untouched (VAL-60)
-    const key = `${crypto.randomUUID()}.${validated.extension}`;
+    const key = `cv/${crypto.randomUUID()}.${validated.extension}`;
     const storageKey = await this.storage.save(fileInput.buffer, key, validated.mimeType);
 
     // 4. Calculate updated profile completion rate with hasCv = true (VAL-58)

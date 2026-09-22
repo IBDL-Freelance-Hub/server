@@ -117,7 +117,7 @@ describe('UploadCvUseCase Unit Tests', () => {
     // Verify storage saved with non-guessable key and mimeType
     expect(mockStorage.save).toHaveBeenCalledWith(
       expect.any(Buffer),
-      expect.stringMatching(/^[0-9a-f-]+\.pdf$/),
+      expect.stringMatching(/^cv\/[0-9a-f-]+\.pdf$/),
       'application/pdf',
     );
 
