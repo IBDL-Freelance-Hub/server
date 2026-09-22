@@ -1,89 +1,124 @@
-import { Resend } from 'resend';
+import fs from 'fs';
+import path from 'path';
+import nodemailer from 'nodemailer';
+import type { Transporter } from 'nodemailer';
+
+export interface EmailAttachment {
+  filename: string;
+  content?: Buffer | string;
+  path?: string;
+  cid?: string;
+}
 
 export interface SendEmailParams {
   to: string;
   subject: string;
   html: string;
+  attachments?: EmailAttachment[];
 }
 
 export interface IEmailProvider {
   sendEmail(params: SendEmailParams): Promise<void>;
 }
 
-export class ResendEmailProvider implements IEmailProvider {
-  private resendClient: Resend | null = null;
+export class SmtpEmailProvider implements IEmailProvider {
+  private transporter: Transporter | null = null;
 
   constructor() {
-    const apiKey = process.env.RESEND_API_KEY;
-    if (apiKey) {
-      this.resendClient = new Resend(apiKey);
-    }
+    this.initTransporter();
   }
 
-  async sendEmail({ to, subject, html }: SendEmailParams): Promise<void> {
-    const apiKey = process.env.RESEND_API_KEY;
-    if (apiKey && !this.resendClient) {
-      this.resendClient = new Resend(apiKey);
+  private initTransporter(): Transporter | null {
+    const host = process.env.SMTP_HOST;
+    const user = process.env.SMTP_USER;
+    const pass = process.env.SMTP_PASS;
+    const port = Number(process.env.SMTP_PORT) || 465;
+    const secure = process.env.SMTP_SECURE === 'true' || port === 465;
+
+    if (host && user && pass) {
+      this.transporter = nodemailer.createTransport({
+        host,
+        port,
+        secure,
+        auth: {
+          user,
+          pass,
+        },
+        pool: true,
+        maxConnections: 5,
+        maxMessages: 100,
+      });
     }
 
-    if (!this.resendClient) {
-      // Graceful fallback for local development or testing environments where RESEND_API_KEY is unset
+    return this.transporter;
+  }
+
+  async sendEmail({ to, subject, html, attachments = [] }: SendEmailParams): Promise<void> {
+    if (!this.transporter) {
+      this.initTransporter();
+    }
+
+    if (!this.transporter) {
+      // Graceful fallback for local development or testing environments where SMTP is unset
       console.log(`[EmailProvider Fallback Log] To: ${to} | Subject: ${subject}`);
       return;
     }
 
-    let targetEmail = to;
-    if (process.env.NODE_ENV === 'development' && process.env.RESEND_TEST_RECIPIENT) {
-      targetEmail = process.env.RESEND_TEST_RECIPIENT;
-    }
+    const fromAddress =
+      process.env.EMAIL_FROM ||
+      (process.env.SMTP_USER
+        ? `Freelancers Hub <${process.env.SMTP_USER}>`
+        : 'Freelancers Hub <freelancer-hub@ibdl.net>');
 
-    const fromAddress = process.env.EMAIL_FROM || 'IBDL Freelancer Hub <onboarding@resend.dev>';
-    const isSandbox = fromAddress.includes('resend.dev');
-
-    let emailSubject = subject;
-    const emailHtml = html;
-
-    // Resend sandbox mode only allows sending to the account owner (ashrafmarwa987@gmail.com)
-    if (isSandbox && targetEmail.toLowerCase() !== 'ashrafmarwa987@gmail.com') {
-      console.warn(
-        `[EmailProvider Resend Sandbox] Redirecting email intended for '${to}' to verified account 'ashrafmarwa987@gmail.com' to ensure successful delivery.`,
-      );
-      emailSubject = `[Test Mode - For ${to}] ${subject}`;
-      targetEmail = 'ashrafmarwa987@gmail.com';
+    const emailAttachments = [...attachments];
+    if (
+      html.includes('cid:ibdl-logo') &&
+      !emailAttachments.some((att) => att.cid === 'ibdl-logo')
+    ) {
+      const logoPath = path.resolve(__dirname, '../assets/ibdl-official-logo.png');
+      if (fs.existsSync(logoPath)) {
+        emailAttachments.push({
+          filename: 'ibdl-official-logo.png',
+          path: logoPath,
+          cid: 'ibdl-logo',
+        });
+      }
     }
 
     try {
-      const response = await this.resendClient.emails.send({
+      const info = await this.transporter.sendMail({
         from: fromAddress,
-        to: targetEmail,
-        subject: emailSubject,
-        html: emailHtml,
+        to,
+        subject,
+        html,
+        attachments: emailAttachments.length > 0 ? emailAttachments : undefined,
       });
 
-      if (response.error) {
-        console.error('[Resend API Error]:', response.error);
-
-        const isResendRestriction =
-          response.error.name === 'validation_error' ||
-          (response.error as { statusCode?: number }).statusCode === 403 ||
-          response.error.message?.includes('only send testing emails');
-
-        if (isResendRestriction) {
-          console.warn(
-            `[EmailProvider Resend Sandbox Restriction] Email to '${to}' failed because Resend test mode only permits sending to registered account owners or verified domains.`,
-          );
-          return;
-        }
-
-        throw new Error(response.error.message || 'Failed to send email via Resend');
-      }
-
-      console.log(`[Resend Email Sent Successfully]: to=${targetEmail}, id=${response.data?.id}`);
+      console.log(`[SMTP Email Sent Successfully]: to=${to}, messageId=${info.messageId}`);
     } catch (error: unknown) {
-      console.error('[EmailProvider Error] Failed to send email via Resend:', error);
+      console.error('[EmailProvider Error] Failed to send email via SMTP:', error);
       throw error;
+    }
+  }
+
+  async verifyConnection(): Promise<boolean> {
+    if (!this.transporter) {
+      this.initTransporter();
+    }
+    if (!this.transporter) {
+      return false;
+    }
+    try {
+      await this.transporter.verify();
+      return true;
+    } catch (err) {
+      console.error('[EmailProvider] Transporter verify failed:', err);
+      return false;
     }
   }
 }
 
-export const emailProvider = new ResendEmailProvider();
+// Backward-compatibility alias
+export const ResendEmailProvider = SmtpEmailProvider;
+
+export const emailProvider = new SmtpEmailProvider();
