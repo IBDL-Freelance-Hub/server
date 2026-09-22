@@ -85,6 +85,28 @@ export class SmtpEmailProvider implements IEmailProvider {
       }
     }
 
+    const assessmentLogos = [
+      { cid: 'pqp-logo', file: 'assessments/pqp.png' },
+      { cid: 'cpat-logo', file: 'assessments/cpat.png' },
+      { cid: 'md-logo', file: 'assessments/management-drives.png' },
+    ];
+
+    for (const item of assessmentLogos) {
+      if (
+        html.includes(`cid:${item.cid}`) &&
+        !emailAttachments.some((att) => att.cid === item.cid)
+      ) {
+        const logoPath = path.resolve(__dirname, '../assets', item.file);
+        if (fs.existsSync(logoPath)) {
+          emailAttachments.push({
+            filename: path.basename(item.file),
+            path: logoPath,
+            cid: item.cid,
+          });
+        }
+      }
+    }
+
     try {
       const info = await this.transporter.sendMail({
         from: fromAddress,
