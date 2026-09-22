@@ -224,9 +224,9 @@ export class RegisterMemberUseCase {
     const cpatLink = 'https://cpat.ibdl.net/start';
     const mdLink = 'https://managementdrives.ibdl.net/start';
 
-    // Dispatch welcome email asynchronously without blocking HTTP response (fire-and-forget)
-    this.emailSvc
-      .sendEmail({
+    // Await welcome email dispatch so Vercel Serverless does not terminate execution prematurely
+    try {
+      await this.emailSvc.sendEmail({
         to: user.email,
         subject: 'Welcome to Freelancers Hub — Your 3 Free Assessments Are Ready',
         html: `<!DOCTYPE html>
@@ -495,10 +495,10 @@ export class RegisterMemberUseCase {
 
 </body>
 </html>`,
-      })
-      .catch((err) =>
-        console.warn('[Background Welcome Email Failed]', err instanceof Error ? err.message : err),
-      );
+      });
+    } catch (err) {
+      console.warn('[Welcome Email Send Error]', err instanceof Error ? err.message : err);
+    }
 
     return {
       member: {
