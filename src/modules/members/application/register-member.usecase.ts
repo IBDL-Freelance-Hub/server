@@ -216,7 +216,7 @@ export class RegisterMemberUseCase {
 
     const firstName = member.fullNameEn.trim().split(/\s+/)[0] || member.fullNameEn.trim();
     const clientUrl = getFrontendBaseUrl();
-    const logoUrl = process.env.PUBLIC_LOGO_URL || 'https://ibdl.net/site/images/logo.png';
+    const logoUrl = process.env.PUBLIC_LOGO_URL || 'cid:ibdl-logo';
     const activationUrl = `${clientUrl}/activate?token=${rawToken}`;
     const pqpLink = claimedCredential.accessUrl.startsWith('http')
       ? claimedCredential.accessUrl
@@ -250,15 +250,15 @@ export class RegisterMemberUseCase {
 
         <!-- ===== HEADER ===== -->
         <tr>
-          <td align="center" style="background-color:#1D1D39; padding:36px 24px;">
-            <table role="presentation" cellpadding="0" cellspacing="0">
+          <td align="center" style="background-color:#1D1D39; padding:32px 24px 26px 24px;">
+            <table role="presentation" cellpadding="0" cellspacing="0" style="margin:0 auto;">
               <tr>
-                <td align="center" style="background-color:#FFFFFF; border-radius:50%; width:84px; height:84px;">
-                  <img src="${logoUrl}" width="52" height="52" alt="IBDL" style="display:block; margin:16px auto; object-fit:contain;">
+                <td align="center">
+                  <img src="${logoUrl}" width="240" alt="IBDL - Elevate Learning Impact" style="display:block; width:240px; max-width:100%; height:auto; margin:0 auto; border:0;" />
                 </td>
               </tr>
             </table>
-            <div style="color:#FFFFFF; font-size:13px; letter-spacing:1px; margin-top:14px; opacity:0.75;">
+            <div style="color:#FFFFFF; font-size:12px; letter-spacing:2px; margin-top:14px; opacity:0.8; font-family:'Segoe UI', Roboto, Arial, sans-serif; text-transform:uppercase; font-weight:600;">
               FREELANCERS HUB &nbsp;|&nbsp; POWERED BY IBDL
             </div>
           </td>

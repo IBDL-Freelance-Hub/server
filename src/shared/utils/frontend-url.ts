@@ -32,5 +32,5 @@ export function getFrontendBaseUrl(): string {
     return 'http://localhost:3000';
   }
 
-  return 'https://freelancers.ibdl.net';
+  return 'https://ibdlfreelancehub.vercel.app';
 }
