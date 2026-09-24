@@ -14,7 +14,15 @@ export class MembershipController {
 
   getTiers = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     try {
+      const isPublic = !req.user;
       const tiers = await this.getMembershipTiersUseCase.execute(req.user?.id);
+
+      if (isPublic) {
+        res.setHeader('Cache-Control', 'public, max-age=300, stale-while-revalidate=600');
+      } else {
+        res.setHeader('Cache-Control', 'private, no-cache');
+      }
+
       res.status(200).json({
         success: true,
         data: tiers,

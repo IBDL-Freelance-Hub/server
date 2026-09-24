@@ -32,14 +32,33 @@ async function gracefulShutdown(signal: string, exitCode = 0) {
 
   console.log(`[Process]: Received ${signal}. Initiating graceful shutdown...`);
 
-  // Set safety force-exit timeout (10 seconds)
-  const forceExitTimeout = setTimeout(() => {
+  // Close idle HTTP keep-alive connections immediately so server.close doesn't hang
+  if (server && typeof server.closeIdleConnections === 'function') {
+    server.closeIdleConnections();
+  }
+
+  // Safety force-exit timeout (10 seconds)
+  const forceExitTimeout = setTimeout(async () => {
     console.error('[Process]: Graceful shutdown timed out after 10s. Forcing exit.');
+    try {
+      await prisma.$disconnect();
+    } catch {
+      // Ignore errors on emergency exit
+    }
     process.exit(1);
   }, 10000);
 
   // Ensure timer doesn't keep process alive if everything closes cleanly
   forceExitTimeout.unref();
+
+  // In-flight active connection drain grace period (5 seconds)
+  const drainTimeout = setTimeout(() => {
+    if (server && typeof server.closeAllConnections === 'function') {
+      console.warn('[Process]: In-flight request drain limit reached; closing active sockets.');
+      server.closeAllConnections();
+    }
+  }, 5000);
+  drainTimeout.unref();
 
   if (server) {
     server.close(async (err) => {

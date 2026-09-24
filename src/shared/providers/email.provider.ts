@@ -70,18 +70,55 @@ export class SmtpEmailProvider implements IEmailProvider {
         ? `Freelancers Hub <${process.env.SMTP_USER}>`
         : 'Freelancers Hub <freelancer-hub@ibdl.net>');
 
+    const assetExistsCache = new Map<string, boolean>();
+
+    async function isAssetAvailable(filePath: string): Promise<boolean> {
+      const cached = assetExistsCache.get(filePath);
+      if (cached !== undefined) return cached;
+      try {
+        await fs.promises.access(filePath, fs.constants.R_OK);
+        assetExistsCache.set(filePath, true);
+        return true;
+      } catch {
+        assetExistsCache.set(filePath, false);
+        return false;
+      }
+    }
+
     const emailAttachments = [...attachments];
     if (
       html.includes('cid:ibdl-logo') &&
       !emailAttachments.some((att) => att.cid === 'ibdl-logo')
     ) {
       const logoPath = path.resolve(__dirname, '../assets/ibdl-official-logo.png');
-      if (fs.existsSync(logoPath)) {
+      if (await isAssetAvailable(logoPath)) {
         emailAttachments.push({
           filename: 'ibdl-official-logo.png',
           path: logoPath,
           cid: 'ibdl-logo',
         });
+      }
+    }
+
+    const assessmentLogos = [
+      { cid: 'pqp-logo', file: 'assessments/pqp.png' },
+      { cid: 'cpat-logo', file: 'assessments/cpat.png' },
+      { cid: 'md-logo', file: 'assessments/management-drives.png' },
+    ];
+
+    for (const item of assessmentLogos) {
+      if (
+        html.includes(`cid:${item.cid}`) &&
+        !emailAttachments.some((att) => att.cid === item.cid)
+      ) {
+        const logoPath = path.resolve(__dirname, '../assets', item.file);
+        if (await isAssetAvailable(logoPath)) {
+          emailAttachments.push({
+            filename: path.basename(item.file),
+            path: logoPath,
+            cid: item.cid,
+          });
+        }
       }
     }
 
