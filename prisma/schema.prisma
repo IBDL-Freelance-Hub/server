@@ -88,6 +88,8 @@ model User {
   sessions           Session[]
   verificationTokens VerificationToken[]
   passwordHistory    PasswordHistory[]
+
+  @@index([status, createdAt])
 }
 
 model Member {
@@ -236,6 +238,7 @@ model AuditLog {
   @@index([actorId, action])
   @@index([actorId, createdAt(sort: Desc)])
   @@index([resource, resourceId])
+  @@index([action, resourceId])
   @@index([createdAt])
 }
 
