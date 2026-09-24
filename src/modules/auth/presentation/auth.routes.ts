@@ -1,5 +1,10 @@
 import { Router } from 'express';
-import { validateRequest, requireAuth } from '../../../shared/middleware';
+import {
+  validateRequest,
+  requireAuth,
+  authLoginRateLimiter,
+  sensitiveAuthTokenRateLimiter,
+} from '../../../shared/middleware';
 import {
   activateAccountSchema,
   resendActivationSchema,
@@ -23,14 +28,21 @@ router.post('/activate', validateRequest({ body: activateAccountSchema }), contr
 
 router.post(
   '/resend-activation',
+  sensitiveAuthTokenRateLimiter,
   validateRequest({ body: resendActivationSchema }),
   controller.resendActivation,
 );
 
-router.post('/login', validateRequest({ body: loginSchema }), controller.login);
+router.post(
+  '/login',
+  authLoginRateLimiter,
+  validateRequest({ body: loginSchema }),
+  controller.login,
+);
 
 router.post(
   '/forgot-password',
+  sensitiveAuthTokenRateLimiter,
   validateRequest({ body: forgotPasswordSchema }),
   controller.forgotPassword,
 );

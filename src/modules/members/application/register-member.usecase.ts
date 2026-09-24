@@ -135,16 +135,16 @@ export class RegisterMemberUseCase {
       mdLink: 'https://managementdrives.ibdl.net/start',
     });
 
-    // 7. Dispatch Welcome Email (awaited to ensure Serverless / Lambda contexts don't terminate prematurely)
-    try {
-      await this.emailSvc.sendEmail({
+    // 7. Dispatch Welcome Email (fire-and-forget with background error logging, matching LoginUseCase pattern)
+    this.emailSvc
+      .sendEmail({
         to: user.email,
         subject: 'Welcome to Freelancers Hub — Your 3 Free Assessments Are Ready',
         html: emailHtml,
+      })
+      .catch((err) => {
+        console.warn('[Welcome Email Send Error]', err instanceof Error ? err.message : err);
       });
-    } catch (err) {
-      console.warn('[Welcome Email Send Error]', err instanceof Error ? err.message : err);
-    }
 
     return {
       member: {

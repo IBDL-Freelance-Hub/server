@@ -40,6 +40,7 @@ export class LocalDiskStorageProvider implements StorageProvider {
    */
   async save(buffer: Buffer, key: string, _mimeType: string): Promise<string> {
     const filePath = this.resolveSafePath(key);
+    await fs.promises.mkdir(path.dirname(filePath), { recursive: true });
     await fs.promises.writeFile(filePath, buffer);
     return key;
   }
@@ -53,7 +54,9 @@ export class LocalDiskStorageProvider implements StorageProvider {
     expiresInSeconds: number = DEFAULT_SIGNED_URL_EXPIRY_SECONDS,
   ): Promise<string> {
     const filePath = this.resolveSafePath(storageKey);
-    if (!fs.existsSync(filePath)) {
+    try {
+      await fs.promises.access(filePath, fs.constants.R_OK);
+    } catch {
       throw new NotFoundError('File not found in storage');
     }
 
@@ -90,8 +93,12 @@ export class LocalDiskStorageProvider implements StorageProvider {
    */
   async delete(storageKey: string): Promise<void> {
     const filePath = this.resolveSafePath(storageKey);
-    if (fs.existsSync(filePath)) {
+    try {
       await fs.promises.unlink(filePath);
+    } catch (err: unknown) {
+      if ((err as NodeJS.ErrnoException).code !== 'ENOENT') {
+        throw err;
+      }
     }
   }
 
@@ -107,11 +114,16 @@ export class LocalDiskStorageProvider implements StorageProvider {
   }
 
   /**
-   * Checks if a file exists on disk.
+   * Checks if a file exists on disk asynchronously.
    */
   async fileExists(storageKey: string): Promise<boolean> {
     const filePath = this.resolveSafePath(storageKey);
-    return fs.existsSync(filePath);
+    try {
+      await fs.promises.access(filePath, fs.constants.F_OK);
+      return true;
+    } catch {
+      return false;
+    }
   }
 
   /**
@@ -119,10 +131,14 @@ export class LocalDiskStorageProvider implements StorageProvider {
    */
   async getFileBuffer(storageKey: string): Promise<Buffer> {
     const filePath = this.resolveSafePath(storageKey);
-    if (!fs.existsSync(filePath)) {
-      throw new NotFoundError('File not found in storage');
+    try {
+      return await fs.promises.readFile(filePath);
+    } catch (err: unknown) {
+      if ((err as NodeJS.ErrnoException).code === 'ENOENT') {
+        throw new NotFoundError('File not found in storage');
+      }
+      throw err;
     }
-    return fs.promises.readFile(filePath);
   }
 
   private generateSignature(storageKey: string, expiresAt: number): string {
@@ -139,11 +155,6 @@ export class LocalDiskStorageProvider implements StorageProvider {
     // Guard against directory traversal attacks
     if (!resolvedPath.startsWith(this.uploadDir)) {
       throw new ValidationError('Invalid storage key: path traversal detected');
-    }
-
-    const dir = path.dirname(resolvedPath);
-    if (!fs.existsSync(dir)) {
-      fs.mkdirSync(dir, { recursive: true });
     }
 
     return resolvedPath;

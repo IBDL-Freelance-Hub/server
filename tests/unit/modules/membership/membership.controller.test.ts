@@ -1,7 +1,11 @@
 import { Request, Response, NextFunction } from 'express';
+import type { RequestUser } from '../../../../src/types/express';
 import { MembershipController } from '../../../../src/modules/membership/presentation/membership.controller';
 import { UpgradeMembershipUseCase } from '../../../../src/modules/membership/application/upgrade-membership.usecase';
-import { GetMembershipTiersUseCase } from '../../../../src/modules/membership/application/get-membership-tiers.usecase';
+import {
+  GetMembershipTiersUseCase,
+  MembershipTierCatalogItem,
+} from '../../../../src/modules/membership/application/get-membership-tiers.usecase';
 import { MembershipTier, MembershipStatus } from '@prisma/client';
 import { AuthenticationError } from '../../../../src/shared/errors';
 
@@ -9,7 +13,10 @@ describe('MembershipController Unit Tests (BRU-67, MEM-52, PAY-05)', () => {
   let controller: MembershipController;
   let mockUpgradeUseCase: jest.Mocked<UpgradeMembershipUseCase>;
   let mockGetTiersUseCase: jest.Mocked<GetMembershipTiersUseCase>;
-  let mockReq: Partial<Request>;
+  let mockReq: Partial<Request> & {
+    user?: RequestUser;
+    id?: string;
+  };
   let mockRes: Partial<Response>;
   let mockNext: NextFunction;
 
@@ -32,6 +39,7 @@ describe('MembershipController Unit Tests (BRU-67, MEM-52, PAY-05)', () => {
     mockRes = {
       status: jest.fn().mockReturnThis(),
       json: jest.fn().mockReturnThis(),
+      setHeader: jest.fn().mockReturnThis(),
     };
     mockNext = jest.fn();
   });
@@ -204,10 +212,34 @@ describe('MembershipController Unit Tests (BRU-67, MEM-52, PAY-05)', () => {
         },
       ];
 
+      mockGetTiersUseCase.execute.mockResolvedValue(
+        mockTiers as unknown as MembershipTierCatalogItem[],
+      );
+
+      await controller.getTiers(mockReq as Request, mockRes as Response, mockNext);
+
+      expect(mockRes.setHeader).toHaveBeenCalledWith('Cache-Control', 'private, no-cache');
+      expect(mockRes.status).toHaveBeenCalledWith(200);
+      expect(mockRes.json).toHaveBeenCalledWith({
+        success: true,
+        data: mockTiers,
+      });
+    });
+
+    it('should set public Cache-Control for unauthenticated tiers request', async () => {
+      mockReq = {
+        user: undefined,
+      };
+
+      const mockTiers: MembershipTierCatalogItem[] = [];
       mockGetTiersUseCase.execute.mockResolvedValue(mockTiers);
 
       await controller.getTiers(mockReq as Request, mockRes as Response, mockNext);
 
+      expect(mockRes.setHeader).toHaveBeenCalledWith(
+        'Cache-Control',
+        'public, max-age=300, stale-while-revalidate=600',
+      );
       expect(mockRes.status).toHaveBeenCalledWith(200);
       expect(mockRes.json).toHaveBeenCalledWith({
         success: true,

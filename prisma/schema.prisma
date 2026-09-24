@@ -131,6 +131,7 @@ model Membership {
   member    Member           @relation(fields: [memberId], references: [id], onDelete: Restrict)
 
   @@index([memberId, status])
+  @@index([memberId, createdAt(sort: Desc)])
   @@index([endDate])
 }
 
@@ -214,6 +215,7 @@ model File {
   owner        Member       @relation(fields: [ownerId], references: [id], onDelete: Restrict)
 
   @@index([ownerId, category, status])
+  @@index([ownerId, status])
 }
 
 model AuditLog {
@@ -232,6 +234,7 @@ model AuditLog {
   createdAt      DateTime @default(now())
 
   @@index([actorId, action])
+  @@index([actorId, createdAt(sort: Desc)])
   @@index([resource, resourceId])
   @@index([createdAt])
 }

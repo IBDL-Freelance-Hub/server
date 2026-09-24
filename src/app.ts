@@ -8,6 +8,7 @@ import {
   requestIdMiddleware,
   languageMiddleware,
   errorHandlerMiddleware,
+  globalRateLimiter,
 } from './shared/middleware';
 import { NotFoundError } from './shared/errors';
 
@@ -52,6 +53,9 @@ app.use(
     credentials: true,
   }),
 );
+
+// 3.5 General API-wide Rate Limiter (300 requests per 15 min per IP)
+app.use(globalRateLimiter);
 
 // 4. JSON Body Parser (Strict payload size limit 100kb for DDoS mitigation)
 app.use(express.json({ limit: '100kb' }));

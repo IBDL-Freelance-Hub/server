@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import { validateRequest, requireAuth } from '../../../shared/middleware';
+import { validateRequest, requireAuth, registrationRateLimiter } from '../../../shared/middleware';
 import {
   registerMemberSchema,
   checkDuplicateSchema,
@@ -10,7 +10,12 @@ import { MembersController } from './members.controller';
 const router = Router();
 const controller = new MembersController();
 
-router.post('/register', validateRequest({ body: registerMemberSchema }), controller.register);
+router.post(
+  '/register',
+  registrationRateLimiter,
+  validateRequest({ body: registerMemberSchema }),
+  controller.register,
+);
 
 router.post(
   '/check-duplicate',
