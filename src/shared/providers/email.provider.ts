@@ -44,9 +44,10 @@ export class SmtpEmailProvider implements IEmailProvider {
           user,
           pass,
         },
-        pool: true,
-        maxConnections: 5,
-        maxMessages: 100,
+        pool: false, // Serverless execution: NEVER use pooling to avoid freezing background sockets
+        connectionTimeout: 10000, // 10s connection timeout
+        greetingTimeout: 10000, // 10s greeting timeout
+        socketTimeout: 15000, // 15s socket timeout
       });
     }
 
@@ -59,6 +60,13 @@ export class SmtpEmailProvider implements IEmailProvider {
     }
 
     if (!this.transporter) {
+      if (process.env.NODE_ENV === 'production') {
+        const err = new Error(
+          '[EmailProvider CRITICAL] SMTP transporter is not initialized in production. Check SMTP_HOST, SMTP_USER, and SMTP_PASS.',
+        );
+        console.error(err.message);
+        throw err;
+      }
       // Graceful fallback for local development or testing environments where SMTP is unset
       console.log(`[EmailProvider Fallback Log] To: ${to} | Subject: ${subject}`);
       return;
@@ -122,6 +130,9 @@ export class SmtpEmailProvider implements IEmailProvider {
       }
     }
 
+    const startTime = Date.now();
+    console.log(`[Email Delivery Attempt]: to=${to}, subject="${subject}"`);
+
     try {
       const info = await this.transporter.sendMail({
         from: fromAddress,
@@ -131,9 +142,17 @@ export class SmtpEmailProvider implements IEmailProvider {
         attachments: emailAttachments.length > 0 ? emailAttachments : undefined,
       });
 
-      console.log(`[SMTP Email Sent Successfully]: to=${to}, messageId=${info.messageId}`);
+      const elapsedMs = Date.now() - startTime;
+      console.log(
+        `[Email Delivery Success]: to=${to}, messageId=${info.messageId}, response="${info.response}", duration=${elapsedMs}ms`,
+      );
     } catch (error: unknown) {
-      console.error('[EmailProvider Error] Failed to send email via SMTP:', error);
+      const elapsedMs = Date.now() - startTime;
+      const errorMsg = error instanceof Error ? error.message : String(error);
+      console.error(
+        `[Email Delivery Failed]: to=${to}, subject="${subject}", error="${errorMsg}", duration=${elapsedMs}ms`,
+        error,
+      );
       throw error;
     }
   }

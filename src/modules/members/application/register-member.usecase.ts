@@ -11,6 +11,7 @@ import { normalizePhoneNumber, calculateProfileCompletion } from '../domain';
 import { RegisterMemberInput } from '../presentation/members.schema';
 import { executeRegistrationTransaction } from './services/register-member-transaction.service';
 import { buildWelcomeEmailHtml } from './templates/welcome-email.template';
+import { UploadCvUseCase, UploadFileInput } from '../../files/application/upload-cv.usecase';
 
 export interface RegisterMemberContext {
   requestId?: string;
@@ -45,15 +46,26 @@ export interface RegisterMemberSuccessOutput {
 }
 
 export class RegisterMemberUseCase {
+  private readonly uploadCvUseCase: UploadCvUseCase;
+
   constructor(
     private readonly prisma: PrismaClient = defaultPrisma,
     private readonly emailSvc: IEmailProvider = defaultEmailProvider,
-  ) {}
+    uploadCvUseCase?: UploadCvUseCase,
+  ) {
+    this.uploadCvUseCase = uploadCvUseCase ?? new UploadCvUseCase(prisma);
+  }
 
   async execute(
     input: RegisterMemberInput,
     context?: RegisterMemberContext,
+    fileInput?: UploadFileInput,
   ): Promise<RegisterMemberSuccessOutput> {
+    // 0. Strict Magic Bytes & Format Validation for CV file via the SAME UploadCvUseCase pipeline
+    if (fileInput && fileInput.buffer && fileInput.buffer.length > 0) {
+      this.uploadCvUseCase.validateFile(fileInput);
+    }
+
     // 1. Affirmative consent validation (SEC-13)
     if (!input.termsAccepted) {
       throw new ValidationError('You must agree to the terms to complete registration.');
@@ -117,6 +129,15 @@ export class RegisterMemberUseCase {
       context,
     });
 
+    // 5b. Persist CV file through the SAME UploadCvUseCase pipeline
+    if (fileInput && fileInput.buffer && fileInput.buffer.length > 0) {
+      try {
+        await this.uploadCvUseCase.execute(user.id, fileInput, context);
+      } catch (cvErr) {
+        console.error('[Registration CV Upload Failed]', cvErr);
+      }
+    }
+
     const pqpNote = claimedCredential.isPoolExhausted
       ? 'Specimen credentials for demonstration only — no PQP account exists and nothing is connected to a live assessment service.'
       : 'Live pre-generated assessment voucher claimed from pool.';
@@ -135,16 +156,66 @@ export class RegisterMemberUseCase {
       mdLink: 'https://managementdrives.ibdl.net/start',
     });
 
-    // 7. Dispatch Welcome Email (fire-and-forget with background error logging, matching LoginUseCase pattern)
-    this.emailSvc
-      .sendEmail({
+    // 7. Dispatch Welcome Email (await execution to prevent serverless freeze, with full audit logging)
+    try {
+      await this.emailSvc.sendEmail({
         to: user.email,
         subject: 'Welcome to Freelancers Hub — Your 3 Free Assessments Are Ready',
         html: emailHtml,
-      })
-      .catch((err) => {
-        console.warn('[Welcome Email Send Error]', err instanceof Error ? err.message : err);
       });
+      console.log(`[Welcome Email Dispatched Successfully]: to=${user.email}, userId=${user.id}`);
+      try {
+        await this.prisma.auditLog.createMany({
+          data: [
+            {
+              actorId: user.id,
+              action: 'ACTIVATION_LINK_SENT',
+              resource: 'User',
+              resourceId: user.id,
+              ipAddress: context?.ipAddress || null,
+            },
+            {
+              actorId: user.id,
+              action: 'WELCOME_EMAIL_SENT',
+              resource: 'User',
+              resourceId: user.id,
+              ipAddress: context?.ipAddress || null,
+            },
+          ],
+        });
+      } catch (auditErr) {
+        console.error('[Welcome Email AuditLog Error]', auditErr);
+      }
+    } catch (err) {
+      const errorReason = err instanceof Error ? err.message : String(err);
+      console.error(
+        `[Welcome Email Dispatch Failed]: to=${user.email}, userId=${user.id}, error="${errorReason}"`,
+      );
+      try {
+        await this.prisma.auditLog.createMany({
+          data: [
+            {
+              actorId: user.id,
+              action: 'ACTIVATION_LINK_FAILED',
+              resource: 'User',
+              resourceId: user.id,
+              reason: errorReason.slice(0, 500),
+              ipAddress: context?.ipAddress || null,
+            },
+            {
+              actorId: user.id,
+              action: 'WELCOME_EMAIL_FAILED',
+              resource: 'User',
+              resourceId: user.id,
+              reason: errorReason.slice(0, 500),
+              ipAddress: context?.ipAddress || null,
+            },
+          ],
+        });
+      } catch (auditErr) {
+        console.error('[Welcome Email Failed AuditLog Error]', auditErr);
+      }
+    }
 
     return {
       member: {

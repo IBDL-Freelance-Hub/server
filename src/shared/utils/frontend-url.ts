@@ -12,7 +12,18 @@ import { env } from '../../config/env.config';
 export function getFrontendBaseUrl(): string {
   const customUrl = process.env.FRONTEND_URL?.trim();
   if (customUrl && customUrl !== '') {
-    return customUrl.replace(/\/+$/, '');
+    const isLocal = customUrl.includes('localhost') || customUrl.includes('127.0.0.1');
+    if (!isLocal || process.env.NODE_ENV !== 'production') {
+      return customUrl.replace(/\/+$/, '');
+    }
+  }
+
+  // Vercel production and preview deployment variables
+  if (process.env.VERCEL_PROJECT_PRODUCTION_URL) {
+    return `https://${process.env.VERCEL_PROJECT_PRODUCTION_URL.replace(/\/+$/, '')}`;
+  }
+  if (process.env.VERCEL_URL) {
+    return `https://${process.env.VERCEL_URL.replace(/\/+$/, '')}`;
   }
 
   const corsOrigin = env.CORS_ORIGIN?.trim();
@@ -23,7 +34,7 @@ export function getFrontendBaseUrl(): string {
   ) {
     const firstOrigin = (corsOrigin.split(',')[0] || '').trim();
     const isLocal = firstOrigin.includes('localhost') || firstOrigin.includes('127.0.0.1');
-    if (process.env.NODE_ENV !== 'production' || !isLocal) {
+    if (!isLocal || (process.env.NODE_ENV !== 'production' && !process.env.VERCEL)) {
       return firstOrigin.replace(/\/+$/, '');
     }
   }

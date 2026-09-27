@@ -33,6 +33,24 @@ export const errorHandlerMiddleware = (
     return;
   }
 
+  // Handle Multer upload limits and errors gracefully (e.g. LIMIT_FILE_SIZE)
+  if (err.name === 'MulterError') {
+    const multerErr = err as unknown as { code?: string; message?: string };
+    const message =
+      multerErr.code === 'LIMIT_FILE_SIZE'
+        ? 'File size exceeds maximum allowable limit (25 MB for CV, 5 MB for Photo)'
+        : err.message || 'File upload failed';
+    res.status(400).json({
+      success: false,
+      code: 'VALIDATION_ERROR',
+      message,
+      details: null,
+      requestId,
+      timestamp,
+    });
+    return;
+  }
+
   // Internal Server Error (Unhandled)
   console.error(`[UnhandledError] [${requestId}]:`, err);
 

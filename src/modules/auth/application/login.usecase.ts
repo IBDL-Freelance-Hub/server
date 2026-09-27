@@ -186,7 +186,7 @@ export class LoginUseCase {
     }
 
     // 4. Check account status if user exists
-    if (user.status === 'SUSPENDED' || user.status === 'CLOSED') {
+    if (user.status !== 'ACTIVE') {
       await this.prisma.loginAttempt.create({
         data: {
           email: user.email,
@@ -195,6 +195,14 @@ export class LoginUseCase {
           successful: false,
         },
       });
+
+      if (user.status === 'UNACTIVATED') {
+        throw new AuthorizationError(
+          lang === 'ar'
+            ? 'الحساب غير مفعل بعد. يرجى مراجعة بريدك الإلكتروني والضغط على رابط التفعيل.'
+            : 'Account is not activated yet. Please check your email and click the activation link.',
+        );
+      }
 
       throw new AuthorizationError('Account is not active.');
     }
