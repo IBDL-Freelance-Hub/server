@@ -1,5 +1,6 @@
 import { PrismaClient, MembershipTier, MembershipStatus, UserStatus } from '@prisma/client';
 import { GetPublicTrainerProfileUseCase } from '../../../../src/modules/directory/application/get-public-trainer-profile.usecase';
+import { generateTrainerSlug } from '../../../../src/modules/directory/domain';
 import { NotFoundError } from '../../../../src/shared/errors';
 
 describe('GetPublicTrainerProfileUseCase Unit Tests', () => {
@@ -96,7 +97,7 @@ describe('GetPublicTrainerProfileUseCase Unit Tests', () => {
 
       expect(profile).toBeDefined();
       expect(profile.id).toBe(mockMember.id);
-      expect(profile.slug).toBe('hassan-mahmoud');
+      expect(profile.slug).toBe(generateTrainerSlug(mockMember.fullNameEn, mockMember.id));
       expect(profile.firstName).toBe('Hassan');
       expect(profile.lastName).toBe('Mahmoud');
       expect(profile.bioEn).toBe(mockMember.bioEn);

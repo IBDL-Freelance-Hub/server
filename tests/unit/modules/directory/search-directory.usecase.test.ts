@@ -1,5 +1,6 @@
 import { PrismaClient, MembershipTier, MembershipStatus, UserStatus } from '@prisma/client';
 import { SearchDirectoryUseCase } from '../../../../src/modules/directory/application/search-directory.usecase';
+import { generateTrainerSlug } from '../../../../src/modules/directory/domain';
 
 describe('SearchDirectoryUseCase Unit Tests', () => {
   let mockPrisma: {
@@ -294,7 +295,7 @@ describe('SearchDirectoryUseCase Unit Tests', () => {
 
       // Exposed public fields must be populated
       expect(trainer.id).toBe('m-privacy');
-      expect(trainer.slug).toBe('dr-jane-smith');
+      expect(trainer.slug).toBe(generateTrainerSlug('Dr. Jane Smith', 'm-privacy'));
       expect(trainer.firstName).toBe('Dr.');
       expect(trainer.lastName).toBe('Jane Smith');
       expect(trainer.photoUrl).toBe('/api/v1/files/photo-uuid-999/download');

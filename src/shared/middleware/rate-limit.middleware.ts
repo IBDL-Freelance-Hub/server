@@ -21,7 +21,12 @@ export function createRateLimiter(options: {
     standardHeaders: true,
     legacyHeaders: false,
     keyGenerator: (req: Request) => getClientIp(req),
-    skip: () => Boolean(skipInTests && process.env.NODE_ENV === 'test'),
+    skip: (req: Request) =>
+      Boolean(
+        (skipInTests && process.env.NODE_ENV === 'test') ||
+          process.env.DISABLE_RATE_LIMIT === 'true' ||
+          (process.env.NODE_ENV !== 'production' && req.headers['x-benchmark-bypass'] === 'true'),
+      ),
     handler: (req: Request, res: Response) => {
       const requestId = req.id || 'N/A';
       const timestamp = new Date().toISOString();

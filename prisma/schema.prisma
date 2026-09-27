@@ -118,6 +118,10 @@ model Member {
   files                 File[]
 
   @@index([country, directoryOptIn, profileCompletionRate])
+  @@index([directoryOptIn])
+  @@index([directoryOptIn, profileCompletionRate])
+  @@index([directoryOptIn, createdAt(sort: Desc)])
+  @@index([createdAt(sort: Desc)])
 }
 
 model Membership {

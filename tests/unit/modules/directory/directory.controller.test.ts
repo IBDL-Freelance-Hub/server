@@ -4,6 +4,7 @@ import {
   SearchDirectoryUseCase,
   GetPublicTrainerProfileUseCase,
 } from '../../../../src/modules/directory/application';
+import { DirectoryCacheService } from '../../../../src/modules/directory/infrastructure/directory-cache.service';
 import { MembershipTier } from '@prisma/client';
 
 describe('DirectoryController Unit Tests', () => {
@@ -25,9 +26,11 @@ describe('DirectoryController Unit Tests', () => {
     mockGetProfileUseCase = {
       execute: jest.fn(),
     };
+    const freshCache = new DirectoryCacheService();
     controller = new DirectoryController(
       mockSearchUseCase as unknown as SearchDirectoryUseCase,
       mockGetProfileUseCase as unknown as GetPublicTrainerProfileUseCase,
+      freshCache,
     );
 
     mockReq = {
@@ -83,7 +86,7 @@ describe('DirectoryController Unit Tests', () => {
 
       expect(mockRes.setHeader).toHaveBeenCalledWith(
         'Cache-Control',
-        'public, max-age=60, stale-while-revalidate=120',
+        'public, s-maxage=30, stale-while-revalidate=60',
       );
       expect(mockSearchUseCase.execute).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -142,7 +145,7 @@ describe('DirectoryController Unit Tests', () => {
 
       expect(mockRes.setHeader).toHaveBeenCalledWith(
         'Cache-Control',
-        'public, max-age=60, stale-while-revalidate=120',
+        'public, s-maxage=30, stale-while-revalidate=60',
       );
       expect(mockGetProfileUseCase.execute).toHaveBeenCalledWith('hassan-mahmoud');
       expect(mockRes.status).toHaveBeenCalledWith(200);

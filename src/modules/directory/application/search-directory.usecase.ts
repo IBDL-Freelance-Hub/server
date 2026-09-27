@@ -100,10 +100,27 @@ export class SearchDirectoryUseCase {
       ];
     }
 
-    // 2. Query candidate records
+    // 2. Query candidate records with optimized select projection
     const candidateMembers = await this.prisma.member.findMany({
       where,
-      include: {
+      select: {
+        id: true,
+        fullNameEn: true,
+        fullNameAr: true,
+        country: true,
+        city: true,
+        areasOfExpertise: true,
+        industriesServed: true,
+        languages: true,
+        bioEn: true,
+        bioAr: true,
+        photoFileId: true,
+        directoryOptIn: true,
+        profileCompletionRate: true,
+        phone: true,
+        yearsOfExperience: true,
+        linkedinUrl: true,
+        createdAt: true,
         user: {
           select: {
             id: true,
@@ -114,16 +131,27 @@ export class SearchDirectoryUseCase {
           },
         },
         memberships: {
+          where: {
+            status: {
+              in: [MembershipStatus.ACTIVE, MembershipStatus.GRACE_PERIOD, MembershipStatus.EXPIRED],
+            },
+          },
+          select: {
+            tier: true,
+            status: true,
+            createdAt: true,
+          },
           orderBy: { createdAt: 'desc' },
           take: 1,
         },
         files: {
-          where: { status: 'ACTIVE' },
+          where: { status: 'ACTIVE', category: 'CV' },
           select: {
             id: true,
             category: true,
             status: true,
           },
+          take: 1,
         },
       },
       orderBy: { createdAt: 'desc' },
@@ -294,7 +322,7 @@ export class SearchDirectoryUseCase {
     // 5. Clean pagination
     const total = eligibleTrainers.length;
     const page = Math.max(1, Number(filter.page) || 1);
-    const limit = Math.max(1, Math.min(100, Number(filter.limit) || 12));
+    const limit = Math.max(1, Math.min(50, Number(filter.limit) || 12));
     const totalPages = Math.max(1, Math.ceil(total / limit));
     const offset = (page - 1) * limit;
     const trainers = eligibleTrainers.slice(offset, offset + limit).map((e) => e.item);
