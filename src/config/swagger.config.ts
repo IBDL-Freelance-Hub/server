@@ -570,6 +570,101 @@ const options: swaggerJsdoc.Options = {
             confirmPassword: { type: 'string', format: 'password', example: 'NewSecret123!' },
           },
         },
+        PublicTrainerListItem: {
+          type: 'object',
+          properties: {
+            id: { type: 'string', example: 'd3b07384-d113-46fb-97c3-30514a6012e5' },
+            slug: { type: 'string', example: 'john-doe' },
+            firstName: { type: 'string', example: 'John' },
+            lastName: { type: 'string', example: 'Doe' },
+            titleEn: { type: 'string', nullable: true, example: null },
+            titleAr: { type: 'string', nullable: true, example: null },
+            bioEn: {
+              type: 'string',
+              nullable: true,
+              example: 'Experienced executive corporate trainer.',
+            },
+            bioAr: {
+              type: 'string',
+              nullable: true,
+              example: 'مدرب تنفيذي معتمد للمؤسسات والشركات.',
+            },
+            photoUrl: {
+              type: 'string',
+              nullable: true,
+              example: '/api/v1/files/file_photo_123/download',
+            },
+            country: { type: 'string', example: 'Egypt' },
+            city: { type: 'string', nullable: true, example: 'Cairo' },
+            areasOfExpertise: {
+              type: 'array',
+              items: { type: 'string' },
+              example: ['Leadership Development', 'Strategic Negotiation'],
+            },
+            industriesServed: {
+              type: 'array',
+              items: { type: 'string' },
+              example: ['Banking', 'Telecommunications'],
+            },
+            languages: {
+              type: 'array',
+              items: { type: 'string' },
+              example: ['Arabic', 'English'],
+            },
+            tier: {
+              type: 'string',
+              enum: ['ESSENTIAL', 'PROFESSIONAL', 'MASTER'],
+              example: 'MASTER',
+            },
+            badgeType: {
+              type: 'string',
+              enum: ['PRIORITY', 'FEATURED', 'STANDARD'],
+              example: 'PRIORITY',
+            },
+          },
+        },
+        PublicTrainerProfile: {
+          type: 'object',
+          allOf: [
+            { $ref: '#/components/schemas/PublicTrainerListItem' },
+            {
+              type: 'object',
+              properties: {
+                yearsOfExperience: { type: 'string', nullable: true, example: '6-10' },
+                linkedinUrl: {
+                  type: 'string',
+                  nullable: true,
+                  example: 'https://linkedin.com/in/johndoe',
+                },
+              },
+            },
+          ],
+        },
+        DirectorySearchResponse: {
+          type: 'object',
+          properties: {
+            success: { type: 'boolean', example: true },
+            data: {
+              type: 'object',
+              properties: {
+                trainers: {
+                  type: 'array',
+                  items: { $ref: '#/components/schemas/PublicTrainerListItem' },
+                },
+                total: { type: 'integer', example: 42 },
+                page: { type: 'integer', example: 1 },
+                totalPages: { type: 'integer', example: 4 },
+              },
+            },
+          },
+        },
+        PublicTrainerProfileResponse: {
+          type: 'object',
+          properties: {
+            success: { type: 'boolean', example: true },
+            data: { $ref: '#/components/schemas/PublicTrainerProfile' },
+          },
+        },
       },
     },
     paths: {
@@ -1173,6 +1268,128 @@ const options: swaggerJsdoc.Options = {
           responses: {
             '200': {
               description: 'Logged out successfully',
+            },
+          },
+        },
+      },
+      '/api/v1/directory': {
+        get: {
+          summary: 'Search and Filter Public Trainer Directory',
+          description:
+            'Public endpoint returning eligible accredited trainers with tier-based placement precedence (PRO-33 to PRO-38, DIR-01 to DIR-18). Evaluates strict 100% profile completion and omits private data.',
+          tags: ['Directory'],
+          parameters: [
+            {
+              name: 'search',
+              in: 'query',
+              description: 'Text search matching name or biography',
+              required: false,
+              schema: { type: 'string' },
+            },
+            {
+              name: 'expertise',
+              in: 'query',
+              description: 'Filter by area of expertise',
+              required: false,
+              schema: { type: 'string' },
+            },
+            {
+              name: 'industry',
+              in: 'query',
+              description: 'Filter by industry served',
+              required: false,
+              schema: { type: 'string' },
+            },
+            {
+              name: 'country',
+              in: 'query',
+              description: 'Filter by country',
+              required: false,
+              schema: { type: 'string' },
+            },
+            {
+              name: 'city',
+              in: 'query',
+              description: 'Filter by city',
+              required: false,
+              schema: { type: 'string' },
+            },
+            {
+              name: 'tier',
+              in: 'query',
+              description: 'Filter by membership tier',
+              required: false,
+              schema: {
+                type: 'string',
+                enum: ['ESSENTIAL', 'PROFESSIONAL', 'MASTER'],
+              },
+            },
+            {
+              name: 'page',
+              in: 'query',
+              description: 'Page number for pagination',
+              required: false,
+              schema: { type: 'integer', default: 1 },
+            },
+            {
+              name: 'limit',
+              in: 'query',
+              description: 'Page size limit',
+              required: false,
+              schema: { type: 'integer', default: 12 },
+            },
+          ],
+          responses: {
+            '200': {
+              description: 'Public trainer directory search results',
+              content: {
+                'application/json': {
+                  schema: { $ref: '#/components/schemas/DirectorySearchResponse' },
+                },
+              },
+            },
+            '400': {
+              description: 'Invalid filter query parameters',
+              content: {
+                'application/json': {
+                  schema: { $ref: '#/components/schemas/ErrorResponse' },
+                },
+              },
+            },
+          },
+        },
+      },
+      '/api/v1/directory/{slug}': {
+        get: {
+          summary: 'Get Public Trainer Profile by Slug or ID',
+          description:
+            'Public endpoint returning detailed public trainer profile if eligible under PRO-34. Strictly omits email, phone, and internal documents.',
+          tags: ['Directory'],
+          parameters: [
+            {
+              name: 'slug',
+              in: 'path',
+              description: 'Public URL-safe slug or ID of the trainer',
+              required: true,
+              schema: { type: 'string' },
+            },
+          ],
+          responses: {
+            '200': {
+              description: 'Public trainer profile',
+              content: {
+                'application/json': {
+                  schema: { $ref: '#/components/schemas/PublicTrainerProfileResponse' },
+                },
+              },
+            },
+            '404': {
+              description: 'Trainer profile not found or ineligible',
+              content: {
+                'application/json': {
+                  schema: { $ref: '#/components/schemas/ErrorResponse' },
+                },
+              },
             },
           },
         },
