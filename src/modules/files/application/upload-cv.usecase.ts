@@ -29,6 +29,17 @@ export class UploadCvUseCase {
     private readonly storage: StorageProvider = defaultStorageProvider,
   ) {}
 
+  /**
+   * Validates a CV file buffer for magic bytes, size limits, and malware signatures (UPL-02, UPL-14, VAL-138).
+   * Throws ValidationError if the file fails validation.
+   */
+  validateFile(fileInput: UploadFileInput) {
+    if (!fileInput || !fileInput.buffer) {
+      throw new ValidationError('No file provided for upload');
+    }
+    return this.validator.validateCv(fileInput.buffer, fileInput.originalname);
+  }
+
   async execute(userId: string, fileInput: UploadFileInput, context?: UploadFileContext) {
     if (!fileInput || !fileInput.buffer) {
       throw new ValidationError('No file provided for upload');

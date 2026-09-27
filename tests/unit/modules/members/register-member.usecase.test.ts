@@ -36,6 +36,7 @@ describe('RegisterMemberUseCase Unit Tests', () => {
       },
       auditLog: {
         create: jest.fn(),
+        createMany: jest.fn().mockResolvedValue({ count: 2 }),
       },
       securityConfig: {
         findFirst: jest.fn().mockResolvedValue({ activationLinkLifetimeMinutes: 10 }),
@@ -241,5 +242,102 @@ describe('RegisterMemberUseCase Unit Tests', () => {
       const conflictErr = err as ConflictError;
       expect(conflictErr.details).toEqual({ clashType: 'both' });
     }
+  });
+
+  it('should reject registration with ValidationError when a renamed .jpg is submitted as cv.pdf (magic byte mismatch)', async () => {
+    // A JPEG file disguised as "cv.pdf" (starts with 0xFF 0xD8 0xFF instead of %PDF-)
+    const renamedJpgAsPdfBuffer = Buffer.from([
+      0xff, 0xd8, 0xff, 0xe0, 0x00, 0x10, 0x4a, 0x46, 0x49, 0x46, 0x00, 0x01,
+    ]);
+
+    const fakeFileInput = {
+      buffer: renamedJpgAsPdfBuffer,
+      originalname: 'cv.pdf',
+      size: renamedJpgAsPdfBuffer.length,
+    };
+
+    await expect(useCase.execute(validRegistrationInput, undefined, fakeFileInput)).rejects.toThrow(
+      ValidationError,
+    );
+
+    // Verify error message specifies signature verification failure (UPL-02, UPL-14)
+    try {
+      await useCase.execute(validRegistrationInput, undefined, fakeFileInput);
+    } catch (err: unknown) {
+      expect(err).toBeInstanceOf(ValidationError);
+      const valErr = err as ValidationError;
+      expect(valErr.message).toContain('verified by signature are accepted');
+    }
+
+    // Verify database transaction was never invoked
+    expect(mockPrisma.$transaction).not.toHaveBeenCalled();
+  });
+
+  it('should successfully validate CV and persist through UploadCvUseCase when valid PDF is provided', async () => {
+    (mockPrisma.user.findUnique as jest.Mock).mockResolvedValue(null);
+    (mockPrisma.member.findUnique as jest.Mock).mockResolvedValue(null);
+
+    const mockUser = {
+      id: 'user-cv-1',
+      email: 'marwa.ashraf@example.com',
+      emailNormalized: 'marwa.ashraf@example.com',
+    };
+    const mockMember = {
+      id: 'member-cv-1',
+      userId: 'user-cv-1',
+      fullNameEn: 'Marwa Ashraf',
+    };
+
+    (mockPrisma.member.findUnique as jest.Mock).mockImplementation((args) => {
+      if (args?.where?.userId === 'user-cv-1') {
+        return Promise.resolve({
+          ...mockMember,
+          user: mockUser,
+          files: [],
+        });
+      }
+      return Promise.resolve(null);
+    });
+
+    (mockPrisma.$transaction as jest.Mock).mockImplementation(async (callback) => {
+      const tx = {
+        user: { create: jest.fn().mockResolvedValue(mockUser) },
+        member: {
+          create: jest.fn().mockResolvedValue(mockMember),
+          update: jest.fn().mockResolvedValue(mockMember),
+        },
+        membership: { create: jest.fn().mockResolvedValue({}) },
+        verificationToken: { create: jest.fn().mockResolvedValue({}) },
+        file: {
+          updateMany: jest.fn().mockResolvedValue({ count: 0 }),
+          create: jest.fn().mockResolvedValue({
+            id: 'file-uuid-1',
+            originalName: 'real_resume.pdf',
+            status: 'ACTIVE',
+          }),
+        },
+        auditLog: {
+          create: jest.fn().mockResolvedValue({}),
+          createMany: jest.fn().mockResolvedValue({ count: 3 }),
+        },
+        assessmentCredentialPool: {
+          findFirst: jest.fn().mockResolvedValue(null),
+          update: jest.fn(),
+        },
+      };
+      return callback(tx);
+    });
+
+    const validPdfBuffer = Buffer.from(
+      '%PDF-1.4\n%âãÏÓ\n1 0 obj\n<<\n>>\nendobj\ntrailer\n<<\n>>\n%%EOF',
+    );
+    const validFileInput = {
+      buffer: validPdfBuffer,
+      originalname: 'real_resume.pdf',
+      size: validPdfBuffer.length,
+    };
+
+    const result = await useCase.execute(validRegistrationInput, undefined, validFileInput);
+    expect(result.member.id).toBe('member-cv-1');
   });
 });

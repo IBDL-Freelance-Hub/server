@@ -123,7 +123,27 @@ export class ForgotPasswordUseCase {
           }),
         });
       } catch (err) {
-        console.warn('[ForgotPassword Email Failed]', err instanceof Error ? err.message : err);
+        const errorReason = err instanceof Error ? err.message : String(err);
+        console.error('[ForgotPassword Email Delivery Failed]', {
+          userId: user.id,
+          email: user.email,
+          error: errorReason,
+        });
+
+        try {
+          await this.prisma.auditLog.create({
+            data: {
+              actorId: user.id,
+              action: 'PASSWORD_RESET_EMAIL_FAILED',
+              resource: 'User',
+              resourceId: user.id,
+              reason: errorReason.slice(0, 500),
+              ipAddress,
+            },
+          });
+        } catch (auditErr) {
+          console.error('[ForgotPassword Failed to record failure AuditLog]', auditErr);
+        }
       }
     }
 

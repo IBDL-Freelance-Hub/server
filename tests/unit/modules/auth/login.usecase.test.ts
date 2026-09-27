@@ -136,4 +136,24 @@ describe('LoginUseCase Unit Tests', () => {
       }),
     ).rejects.toThrow(AuthorizationError);
   });
+
+  it('should throw AuthorizationError if account status is UNACTIVATED', async () => {
+    (mockPrisma.loginAttempt.findMany as jest.Mock).mockResolvedValue([]);
+    const mockUnactivatedUser = {
+      id: 'user-unactivated',
+      email: 'unactivated@example.com',
+      passwordHash: '$argon2id$validhash',
+      userType: 'MEMBER',
+      status: 'UNACTIVATED',
+    };
+    (mockPrisma.user.findUnique as jest.Mock).mockResolvedValue(mockUnactivatedUser);
+    (mockHashProvider.verify as jest.Mock).mockResolvedValue(true);
+
+    await expect(
+      useCase.execute({
+        email: 'unactivated@example.com',
+        password: 'Password123',
+      }),
+    ).rejects.toThrow(AuthorizationError);
+  });
 });

@@ -110,4 +110,50 @@ describe('ForgotPasswordUseCase Unit Tests', () => {
       }),
     );
   });
+
+  it('should record an AuditLog entry with action PASSWORD_RESET_EMAIL_FAILED when emailProvider.sendEmail fails', async () => {
+    (mockRateLimiter.checkAndLogRequest as jest.Mock).mockResolvedValue({ allowed: true });
+    const mockUser = {
+      id: 'active-user-2',
+      email: 'active2@example.com',
+      status: 'ACTIVE',
+    };
+    (mockPrisma.user.findUnique as jest.Mock).mockResolvedValue(mockUser);
+    (mockPrisma.securityConfig.findFirst as jest.Mock).mockResolvedValue({
+      resetTokenLifetimeMinutes: 10,
+    });
+    (mockEmailProvider.sendEmail as jest.Mock).mockRejectedValueOnce(
+      new Error('SMTP connection timeout'),
+    );
+
+    const result = await useCase.execute(
+      { email: 'active2@example.com' },
+      { ipAddress: '192.168.1.50' },
+    );
+
+    // Returns generic success for anti-enumeration
+    expect(result.success).toBe(true);
+
+    // Initial audit log for request
+    expect(mockPrisma.auditLog.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          action: 'PASSWORD_RESET_REQUESTED',
+          resourceId: 'active-user-2',
+        }),
+      }),
+    );
+
+    // Second audit log for failure
+    expect(mockPrisma.auditLog.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          action: 'PASSWORD_RESET_EMAIL_FAILED',
+          resourceId: 'active-user-2',
+          reason: 'SMTP connection timeout',
+          ipAddress: '192.168.1.50',
+        }),
+      }),
+    );
+  });
 });

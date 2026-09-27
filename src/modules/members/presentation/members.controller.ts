@@ -29,10 +29,22 @@ export class MembersController {
   ): Promise<void> => {
     try {
       const clientIp = getClientIp(req);
-      const result = await this.registerMemberUseCase.execute(req.body, {
-        requestId: req.id,
-        ipAddress: clientIp,
-      });
+      const fileInput = req.file
+        ? {
+            buffer: req.file.buffer,
+            originalname: req.file.originalname,
+            size: req.file.size,
+          }
+        : undefined;
+
+      const result = await this.registerMemberUseCase.execute(
+        req.body,
+        {
+          requestId: req.id,
+          ipAddress: clientIp,
+        },
+        fileInput,
+      );
 
       res.status(201).json({
         success: true,
