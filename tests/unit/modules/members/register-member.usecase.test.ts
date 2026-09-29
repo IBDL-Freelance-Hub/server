@@ -123,9 +123,10 @@ describe('RegisterMemberUseCase Unit Tests', () => {
     expect(result.member.email).toBe('marwa.ashraf@example.com');
     expect(result.membership.tier).toBe('Essential Membership');
     expect(result.membership.fee).toBe('Free');
-    expect(result.pqpAccess.username).toBe('flh.marwa');
-    expect(result.pqpAccess.password).toBe('ASSESSMENT-2026-DEMO');
-    expect(result.pqpAccess.assessmentLink).toBe('https://assessment.ibdl.net/start');
+    expect(result.pqpAccess.status).toBe('LOCKED_PENDING_ACTIVATION');
+    expect(result.pqpAccess.message).toContain('Account activation required');
+    expect(result.pqpAccess.username).toBeUndefined();
+    expect(result.pqpAccess.password).toBeUndefined();
     expect(result.welcomeEmail.from).toBe('freelancers.hub@ibdl.net');
 
     // Assert 3 policy acceptances recorded in audit log (SEC-13, SEC-14)
@@ -189,9 +190,10 @@ describe('RegisterMemberUseCase Unit Tests', () => {
 
     const result = await useCase.execute(validRegistrationInput);
 
-    expect(result.pqpAccess.username).toBe('pqp_real_user_88');
-    expect(result.pqpAccess.password).toBe('RealSecretPassword99');
-    expect(result.pqpAccess.assessmentLink).toBe('pqp.ibdl.net/real-portal');
+    expect(result.pqpAccess.status).toBe('LOCKED_PENDING_ACTIVATION');
+    expect(result.pqpAccess.message).toContain('Account activation required');
+    expect(result.pqpAccess.username).toBeUndefined();
+    expect(result.pqpAccess.password).toBeUndefined();
     expect(result.pqpAccess.note).toBe('Live pre-generated assessment voucher claimed from pool.');
   });
 

@@ -60,6 +60,9 @@ describe('GetMemberProfileUseCase Unit Tests', () => {
       member: {
         findUnique: jest.fn(),
       },
+      assessmentCredentialPool: {
+        findFirst: jest.fn(),
+      },
     } as unknown as jest.Mocked<PrismaClient>;
 
     useCase = new GetMemberProfileUseCase(mockPrisma);

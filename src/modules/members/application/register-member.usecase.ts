@@ -33,10 +33,12 @@ export interface RegisterMemberSuccessOutput {
     renewsOn: string;
   };
   pqpAccess: {
-    username: string;
-    password: string;
-    assessmentLink: string;
-    note: string;
+    status: string;
+    message: string;
+    username?: string;
+    password?: string;
+    assessmentLink?: string;
+    note?: string;
   };
   welcomeEmail: {
     from: string;
@@ -232,9 +234,8 @@ export class RegisterMemberUseCase {
         renewsOn: endDate.toISOString(),
       },
       pqpAccess: {
-        username: claimedCredential.username,
-        password: claimedCredential.password,
-        assessmentLink: claimedCredential.accessUrl,
+        status: 'LOCKED_PENDING_ACTIVATION',
+        message: 'Account activation required to unlock assessment credentials.',
         note: pqpNote,
       },
       welcomeEmail: {

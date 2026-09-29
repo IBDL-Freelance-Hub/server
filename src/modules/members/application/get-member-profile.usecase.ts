@@ -64,6 +64,30 @@ export class GetMemberProfileUseCase {
 
     const activeMembership = member.memberships[0] || null;
 
+    let assessmentCredentials = null;
+    if (member.user.status === 'ACTIVE') {
+      const cred = await this.prisma.assessmentCredentialPool?.findFirst?.({
+        where: { assignedTo: userId },
+        orderBy: { assignedAt: 'desc' },
+      });
+
+      assessmentCredentials = {
+        name: 'Professional Quality Practitioner (PQP™)',
+        portalUrl: cred?.accessUrl || 'https://assessment.ibdl.net/start',
+        username: cred ? cred.username : `flh.${userId.slice(0, 6)}`,
+        password: cred ? cred.password : 'ASSESSMENT-2026-DEMO',
+        status: 'ACTIVE',
+        note: 'Credentials are single-use per assessment module. Do not share.',
+      };
+    } else {
+      assessmentCredentials = {
+        name: 'Professional Quality Practitioner (PQP™)',
+        portalUrl: 'https://assessment.ibdl.net/start',
+        status: 'LOCKED',
+        note: 'Account activation required to unlock assessment credentials.',
+      };
+    }
+
     return {
       id: member.id,
       userId: member.userId,
@@ -95,6 +119,7 @@ export class GetMemberProfileUseCase {
             endDate: activeMembership.endDate,
           }
         : null,
+      assessmentCredentials,
       files: member.files,
       createdAt: member.createdAt,
       updatedAt: member.updatedAt,
