@@ -121,4 +121,43 @@ describe('GetMemberProfileUseCase Unit Tests', () => {
     await expect(useCase.execute('non-existent-user')).rejects.toThrow(NotFoundError);
     await expect(useCase.execute('non-existent-user')).rejects.toThrow('Member profile not found');
   });
+
+  it('should return unified credentials with all 3 assessment portals when user is ACTIVE', async () => {
+    (mockPrisma.member.findUnique as jest.Mock).mockResolvedValue(mockDbMember);
+    (mockPrisma.assessmentCredentialPool.findFirst as jest.Mock).mockResolvedValue({
+      id: 'cred-1',
+      username: 'flh.testuser',
+      password: 'LivePassword123!',
+      accessUrl: 'https://pqp.ibdl.net/start',
+    });
+
+    const result = await useCase.execute('user-uuid-1');
+
+    expect(result.assessmentCredentials).toBeDefined();
+    expect(result.assessmentCredentials?.status).toBe('ACTIVE');
+    expect(result.assessmentCredentials?.username).toBe('flh.testuser');
+    expect(result.assessmentCredentials?.password).toBe('LivePassword123!');
+    expect(result.assessmentCredentials?.portals).toHaveLength(3);
+    expect(result.assessmentCredentials?.portals?.[0]?.key).toBe('pqp');
+    expect(result.assessmentCredentials?.portals?.[1]?.key).toBe('cpat');
+    expect(result.assessmentCredentials?.portals?.[2]?.key).toBe('md');
+  });
+
+  it('should return LOCKED assessment status without exposing credentials when user is not ACTIVE', async () => {
+    const inactiveMember = {
+      ...mockDbMember,
+      user: {
+        ...mockDbMember.user,
+        status: 'UNACTIVATED',
+      },
+    };
+    (mockPrisma.member.findUnique as jest.Mock).mockResolvedValue(inactiveMember);
+
+    const result = await useCase.execute('user-uuid-1');
+
+    expect(result.assessmentCredentials).toBeDefined();
+    expect(result.assessmentCredentials?.status).toBe('LOCKED');
+    expect(result.assessmentCredentials?.username).toBeUndefined();
+    expect(result.assessmentCredentials?.password).toBeUndefined();
+  });
 });

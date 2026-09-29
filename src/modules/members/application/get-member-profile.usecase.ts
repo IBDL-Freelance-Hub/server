@@ -71,18 +71,51 @@ export class GetMemberProfileUseCase {
         orderBy: { assignedAt: 'desc' },
       });
 
+      const username = cred ? cred.username : `flh.${userId.slice(0, 6)}`;
+      const password = cred ? cred.password : 'ASSESSMENT-2026-DEMO';
+      const pqpUrl = cred?.accessUrl || 'https://pqp.ibdl.net/start';
+
       assessmentCredentials = {
-        name: 'Professional Quality Practitioner (PQP™)',
-        portalUrl: cred?.accessUrl || 'https://assessment.ibdl.net/start',
-        username: cred ? cred.username : `flh.${userId.slice(0, 6)}`,
-        password: cred ? cred.password : 'ASSESSMENT-2026-DEMO',
+        name: 'IBDL 3 Diagnostic Assessments (PQP™, CPAT™, Management Drives®)',
+        portalUrl: pqpUrl,
+        username,
+        password,
         status: 'ACTIVE',
-        note: 'Credentials are single-use per assessment module. Do not share.',
+        note: 'Unified single login for all 3 diagnostic assessments. 1 completed attempt per tool.',
+        portals: [
+          {
+            key: 'pqp',
+            code: 'PQP™',
+            nameEn: 'Professional Quality Practitioner (PQP™)',
+            nameAr: 'محترف الجودة المهنية (PQP™)',
+            tagEn: 'Quality & Operations',
+            tagAr: 'معايير الجودة والعمليات',
+            url: pqpUrl,
+          },
+          {
+            key: 'cpat',
+            code: 'CPAT™',
+            nameEn: 'Certified Professional Agile Trainer (CPAT™)',
+            nameAr: 'مدرب أجايل المعتمد دولياً (CPAT™)',
+            tagEn: 'Agile & Training',
+            tagAr: 'التدريب الرشيق وتيسير الورش',
+            url: 'https://cpat.ibdl.net/start',
+          },
+          {
+            key: 'md',
+            code: 'Management Drives®',
+            nameEn: 'Management Drives® Assessment',
+            nameAr: 'محركات الإدارة والسلوك (Management Drives®)',
+            tagEn: 'Leadership & Culture',
+            tagAr: 'أنماط القيادة والدوافع المؤسسية',
+            url: 'https://md.ibdl.net/start',
+          },
+        ],
       };
     } else {
       assessmentCredentials = {
-        name: 'Professional Quality Practitioner (PQP™)',
-        portalUrl: 'https://assessment.ibdl.net/start',
+        name: 'IBDL 3 Diagnostic Assessments (PQP™, CPAT™, Management Drives®)',
+        portalUrl: 'https://pqp.ibdl.net/start',
         status: 'LOCKED',
         note: 'Account activation required to unlock assessment credentials.',
       };
