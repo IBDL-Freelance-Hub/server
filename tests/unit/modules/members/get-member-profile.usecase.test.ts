@@ -139,8 +139,11 @@ describe('GetMemberProfileUseCase Unit Tests', () => {
     expect(result.assessmentCredentials?.password).toBe('LivePassword123!');
     expect(result.assessmentCredentials?.portals).toHaveLength(3);
     expect(result.assessmentCredentials?.portals?.[0]?.key).toBe('pqp');
+    expect(result.assessmentCredentials?.portals?.[0]?.logoUrl).toBe('/tools_logos/pqp.png');
     expect(result.assessmentCredentials?.portals?.[1]?.key).toBe('cpat');
+    expect(result.assessmentCredentials?.portals?.[1]?.logoUrl).toBe('/tools_logos/cpat.png');
     expect(result.assessmentCredentials?.portals?.[2]?.key).toBe('md');
+    expect(result.assessmentCredentials?.portals?.[2]?.logoUrl).toBe('/tools_logos/management-drives.png');
   });
 
   it('should return LOCKED assessment status without exposing credentials when user is not ACTIVE', async () => {

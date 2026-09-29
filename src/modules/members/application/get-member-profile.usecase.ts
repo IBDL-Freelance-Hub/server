@@ -90,6 +90,7 @@ export class GetMemberProfileUseCase {
             nameAr: 'محترف الجودة المهنية (PQP™)',
             tagEn: 'Quality & Operations',
             tagAr: 'معايير الجودة والعمليات',
+            logoUrl: '/tools_logos/pqp.png',
             url: pqpUrl,
           },
           {
@@ -99,6 +100,7 @@ export class GetMemberProfileUseCase {
             nameAr: 'مدرب أجايل المعتمد دولياً (CPAT™)',
             tagEn: 'Agile & Training',
             tagAr: 'التدريب الرشيق وتيسير الورش',
+            logoUrl: '/tools_logos/cpat.png',
             url: 'https://cpat.ibdl.net/start',
           },
           {
@@ -108,6 +110,7 @@ export class GetMemberProfileUseCase {
             nameAr: 'محركات الإدارة والسلوك (Management Drives®)',
             tagEn: 'Leadership & Culture',
             tagAr: 'أنماط القيادة والدوافع المؤسسية',
+            logoUrl: '/tools_logos/management-drives.png',
             url: 'https://md.ibdl.net/start',
           },
         ],
