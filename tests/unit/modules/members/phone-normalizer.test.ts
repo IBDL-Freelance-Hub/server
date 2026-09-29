@@ -26,6 +26,15 @@ describe('Phone Normalizer Domain Unit Tests', () => {
       expect(normalizeCountryKey('+968')).toBe('OM');
     });
 
+    it('should correctly identify UAE and Kuwait country aliases', () => {
+      expect(normalizeCountryKey('United Arab Emirates')).toBe('AE');
+      expect(normalizeCountryKey('UAE')).toBe('AE');
+      expect(normalizeCountryKey('+971')).toBe('AE');
+      expect(normalizeCountryKey('Kuwait')).toBe('KW');
+      expect(normalizeCountryKey('KW')).toBe('KW');
+      expect(normalizeCountryKey('+965')).toBe('KW');
+    });
+
     it('should throw ValidationError for unsupported country', () => {
       expect(() => normalizeCountryKey('United States')).toThrow(ValidationError);
       expect(() => normalizeCountryKey('UK')).toThrow(ValidationError);
@@ -91,6 +100,32 @@ describe('Phone Normalizer Domain Unit Tests', () => {
       expect(() => normalizePhoneNumber('51234567', 'Oman')).toThrow(ValidationError);
       // Incorrect length
       expect(() => normalizePhoneNumber('912345', 'Oman')).toThrow(ValidationError);
+    });
+  });
+
+  describe('UAE Phone Normalization (+971)', () => {
+    it('should normalize standard UAE mobile numbers', () => {
+      expect(normalizePhoneNumber('0501234567', 'UAE')).toBe('+971501234567');
+      expect(normalizePhoneNumber('0521234567', 'AE')).toBe('+971521234567');
+      expect(normalizePhoneNumber('+971541234567', 'UAE')).toBe('+971541234567');
+    });
+
+    it('should throw ValidationError for invalid UAE mobile numbers', () => {
+      expect(() => normalizePhoneNumber('0511234567', 'UAE')).toThrow(ValidationError);
+      expect(() => normalizePhoneNumber('0501234', 'UAE')).toThrow(ValidationError);
+    });
+  });
+
+  describe('Kuwait Phone Normalization (+965)', () => {
+    it('should normalize standard Kuwait mobile numbers starting with 5, 6, 9', () => {
+      expect(normalizePhoneNumber('51234567', 'Kuwait')).toBe('+96551234567');
+      expect(normalizePhoneNumber('61234567', 'KW')).toBe('+96561234567');
+      expect(normalizePhoneNumber('+96591234567', 'Kuwait')).toBe('+96591234567');
+    });
+
+    it('should throw ValidationError for invalid Kuwait mobile numbers', () => {
+      expect(() => normalizePhoneNumber('41234567', 'Kuwait')).toThrow(ValidationError);
+      expect(() => normalizePhoneNumber('51234', 'Kuwait')).toThrow(ValidationError);
     });
   });
 

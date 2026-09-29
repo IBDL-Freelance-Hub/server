@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { emailSchema } from '../../../shared/validation';
+import { isValidMobileForCountry } from '../domain';
 
 export const experienceBands = ['<2', '2-5', '6-10', '11-15', '>15'] as const;
 
@@ -12,45 +13,57 @@ export const formatBioTooLongMessage = (limit: number, lang: 'en' | 'ar' = 'en')
     ? `هذا الإدخال طويل جداً. يرجى تقصيره إلى ${limit} حرفاً أو أقل.`
     : `This entry is too long. Shorten it to ${limit} characters or fewer.`;
 
-export const registerMemberSchema = z.object({
-  fullName: z.string().trim().min(2, 'Full name must be at least 2 characters long'),
-  email: emailSchema,
-  mobile: z
-    .string()
-    .trim()
-    .refine((val) => val.replace(/\D/g, '').length >= 7, {
-      message: 'Mobile number must contain at least 7 digits',
+export const registerMemberSchema = z
+  .object({
+    fullName: z.string().trim().min(2, 'Full name must be at least 2 characters long'),
+    email: emailSchema,
+    mobile: z
+      .string()
+      .trim()
+      .refine((val) => val.replace(/\D/g, '').length >= 7, {
+        message: 'Mobile number must contain at least 7 digits',
+      }),
+    country: z.string().trim().min(1, 'Country is required'),
+    linkedinUrl: z
+      .string()
+      .trim()
+      .optional()
+      .refine((val) => !val || z.string().url().safeParse(val).success, {
+        message: 'Invalid LinkedIn URL format',
+      }),
+    yearsOfExperience: z.enum(experienceBands, {
+      errorMap: () => ({ message: 'Invalid years of experience band selected' }),
     }),
-  country: z.string().trim().min(1, 'Country is required'),
-  linkedinUrl: z
-    .string()
-    .trim()
-    .optional()
-    .refine((val) => !val || z.string().url().safeParse(val).success, {
-      message: 'Invalid LinkedIn URL format',
+    areasOfExpertise: z.array(z.string()).default([]),
+    industriesServed: z.array(z.string()).default([]),
+    bio: z
+      .string()
+      .trim()
+      .max(
+        DEFAULT_MULTI_LINE_MAX_LENGTH,
+        formatBioTooLongMessage(DEFAULT_MULTI_LINE_MAX_LENGTH, 'en'),
+      )
+      .optional(),
+    message: z.string().trim().optional(),
+    cvFileId: z.string().trim().optional(),
+    directoryOptIn: z.boolean().default(false),
+    termsAccepted: z.literal(true, {
+      errorMap: () => ({
+        message: 'You must agree to the terms to complete registration.',
+      }),
     }),
-  yearsOfExperience: z.enum(experienceBands, {
-    errorMap: () => ({ message: 'Invalid years of experience band selected' }),
-  }),
-  areasOfExpertise: z.array(z.string()).default([]),
-  industriesServed: z.array(z.string()).default([]),
-  bio: z
-    .string()
-    .trim()
-    .max(
-      DEFAULT_MULTI_LINE_MAX_LENGTH,
-      formatBioTooLongMessage(DEFAULT_MULTI_LINE_MAX_LENGTH, 'en'),
-    )
-    .optional(),
-  message: z.string().trim().optional(),
-  cvFileId: z.string().trim().optional(),
-  directoryOptIn: z.boolean().default(false),
-  termsAccepted: z.literal(true, {
-    errorMap: () => ({
-      message: 'You must agree to the terms to complete registration.',
-    }),
-  }),
-});
+  })
+  .superRefine((data, ctx) => {
+    if (data.mobile && data.country) {
+      if (!isValidMobileForCountry(data.mobile, data.country)) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ['mobile'],
+          message: 'Please enter a valid mobile number matching your selected country code.',
+        });
+      }
+    }
+  });
 
 export type RegisterMemberInput = z.infer<typeof registerMemberSchema>;
 
