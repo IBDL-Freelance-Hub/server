@@ -33,5 +33,15 @@
     }
   },
   "include": ["src/**/*", "api/**/*"],
-  "exclude": ["node_modules", "dist", "coverage", "prisma", "docker", "tests"]
+  "exclude": [
+    "node_modules",
+    "dist",
+    "coverage",
+    "prisma",
+    "docker",
+    "tests",
+    "**/__tests__/**",
+    "**/*.test.ts",
+    "**/*.spec.ts"
+  ]
 }
