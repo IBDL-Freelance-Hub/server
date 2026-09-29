@@ -133,7 +133,11 @@ export class SearchDirectoryUseCase {
         memberships: {
           where: {
             status: {
-              in: [MembershipStatus.ACTIVE, MembershipStatus.GRACE_PERIOD, MembershipStatus.EXPIRED],
+              in: [
+                MembershipStatus.ACTIVE,
+                MembershipStatus.GRACE_PERIOD,
+                MembershipStatus.EXPIRED,
+              ],
             },
           },
           select: {

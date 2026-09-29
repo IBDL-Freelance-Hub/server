@@ -68,7 +68,11 @@ async function setupBenchmarkAuth(): Promise<void> {
       console.log(`✅ Created test benchmark user: ${BENCH_USER_EMAIL}`);
     }
 
-    const { rawToken } = await sessionService.createSession(user.id, '127.0.0.1', 'Autocannon-Benchmark');
+    const { rawToken } = await sessionService.createSession(
+      user.id,
+      '127.0.0.1',
+      'Autocannon-Benchmark',
+    );
     AUTH_COOKIE = `flh_session=${rawToken}`;
     AUTH_HEADER = `Bearer ${rawToken}`;
     console.log('✅ Generated fresh active session token for benchmark.');
@@ -98,7 +102,9 @@ interface ScenarioSummary {
 }
 
 async function runScenario(scenario: BenchmarkScenario): Promise<ScenarioSummary> {
-  console.log(`\n⏳ Running: ${scenario.name} (${scenario.connections} connections, ${scenario.duration}s)...`);
+  console.log(
+    `\n⏳ Running: ${scenario.name} (${scenario.connections} connections, ${scenario.duration}s)...`,
+  );
 
   const headers = {
     'x-benchmark-bypass': 'true',
@@ -128,7 +134,7 @@ async function runScenario(scenario: BenchmarkScenario): Promise<ScenarioSummary
     'p97.5 (ms)': latency.p97_5,
     'p99 (ms)': result.latency.p99,
     'Errors (Non-2xx)': result.non2xx,
-    'Timeouts': result.timeouts,
+    Timeouts: result.timeouts,
   };
 }
 
