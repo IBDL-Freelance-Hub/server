@@ -96,6 +96,45 @@ describe('FileValidatorService Unit Tests', () => {
     it('should reject empty or null buffer', () => {
       expect(() => validator.validateCv(Buffer.alloc(0), 'empty.pdf')).toThrow(ValidationError);
     });
+
+    it('should strictly reject image files (JPEG, PNG, WebP, GIF) uploaded as CV', () => {
+      // JPEG
+      const jpegBuffer = Buffer.concat([
+        Buffer.from([0xff, 0xd8, 0xff, 0xe0]),
+        Buffer.from('JPEG image payload'),
+      ]);
+      expect(() => validator.validateCv(jpegBuffer, 'my-cv.jpg')).toThrow(ValidationError);
+      expect(() => validator.validateCv(jpegBuffer, 'my-cv.jpg')).toThrow(
+        'An image was uploaded instead of a CV document',
+      );
+
+      // PNG
+      const pngBuffer = Buffer.concat([
+        Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]),
+        Buffer.from('PNG image payload'),
+      ]);
+      expect(() => validator.validateCv(pngBuffer, 'my-cv.png')).toThrow(ValidationError);
+      expect(() => validator.validateCv(pngBuffer, 'my-cv.png')).toThrow(
+        'An image was uploaded instead of a CV document',
+      );
+
+      // WebP
+      const webpBuffer = Buffer.concat([
+        Buffer.from([0x52, 0x49, 0x46, 0x46, 0x00, 0x00, 0x00, 0x20, 0x57, 0x45, 0x42, 0x50]),
+        Buffer.from('WebP payload'),
+      ]);
+      expect(() => validator.validateCv(webpBuffer, 'my-cv.webp')).toThrow(ValidationError);
+      expect(() => validator.validateCv(webpBuffer, 'my-cv.webp')).toThrow(
+        'An image was uploaded instead of a CV document',
+      );
+
+      // GIF
+      const gifBuffer = Buffer.concat([Buffer.from('GIF89a'), Buffer.from('GIF payload')]);
+      expect(() => validator.validateCv(gifBuffer, 'my-cv.gif')).toThrow(ValidationError);
+      expect(() => validator.validateCv(gifBuffer, 'my-cv.gif')).toThrow(
+        'An image was uploaded instead of a CV document',
+      );
+    });
   });
 
   describe('Profile Photo Validation (PRO-19, UPL-02)', () => {

@@ -1,4 +1,4 @@
-import { ValidationError } from '../../../shared/errors';
+import { ValidationError, FileValidationError } from '../../../shared/errors';
 
 export const CV_MAX_SIZE_BYTES = 25 * 1024 * 1024; // 25 MB per UPL-14
 export const PHOTO_MAX_SIZE_BYTES = 5 * 1024 * 1024; // 5 MB per PRO-19
@@ -19,13 +19,39 @@ export class FileValidatorService {
    * - application/msword (.doc)
    * - application/vnd.openxmlformats-officedocument.wordprocessingml.document (.docx)
    */
-  validateCv(buffer: Buffer, _originalName?: string): ValidatedFileResult {
+  validateCv(buffer: Buffer, originalName?: string): ValidatedFileResult {
     if (!buffer || buffer.length === 0) {
       throw new ValidationError('File buffer is empty or missing');
     }
 
-    // 0. Explicit in-memory malware & executable signature inspection (REJECTED_MALWARE)
+    // 0. Explicit check for prohibited extensions (.exe, .txt, .bat, etc.)
+    if (originalName) {
+      const ext = originalName.split('.').pop()?.toLowerCase();
+      const prohibitedExts = ['exe', 'txt', 'bat', 'cmd', 'sh', 'com', 'msi', 'vbs', 'ps1'];
+      if (ext && prohibitedExts.includes(ext)) {
+        throw new FileValidationError(
+          `Unsupported or prohibited file extension: .${ext}. Only PDF, DOC, and DOCX files are allowed.`,
+          {
+            en: `Unsupported file extension .${ext}. Only PDF, DOC, and DOCX files are allowed.`,
+            ar: `صيغة الملف .${ext} غير مدعومة. نقبل فقط ملفات PDF و DOC و DOCX.`,
+          },
+        );
+      }
+    }
+
+    // 0a. Explicit in-memory malware & executable signature inspection (REJECTED_MALWARE)
     this.scanForMalware(buffer);
+
+    // 0b. Explicit image detection: reject images uploaded as CV documents
+    if (this.isJpeg(buffer) || this.isPng(buffer) || this.isWebp(buffer) || this.isGif(buffer)) {
+      throw new FileValidationError(
+        'Invalid CV file format. An image was uploaded instead of a CV document. Only PDF, DOC, and DOCX files verified by signature are accepted (UPL-02, UPL-14).',
+        {
+          en: 'Invalid CV file format. An image was uploaded instead of a CV document. Only PDF, DOC, and DOCX files verified by signature are accepted.',
+          ar: 'صيغة السيرة الذاتية غير صالحة. تم تحميل صورة بدلاً من مستند السيرة الذاتية. نقبل فقط ملفات PDF و DOC و DOCX.',
+        },
+      );
+    }
 
     if (buffer.length > CV_MAX_SIZE_BYTES) {
       throw new ValidationError(
@@ -60,8 +86,12 @@ export class FileValidatorService {
       };
     }
 
-    throw new ValidationError(
+    throw new FileValidationError(
       'Invalid CV file format. Only PDF, DOC, and DOCX files verified by signature are accepted (UPL-02, UPL-14).',
+      {
+        en: 'Invalid CV file format. Only PDF, DOC, and DOCX files verified by signature are accepted.',
+        ar: 'صيغة السيرة الذاتية غير صالحة. نقبل فقط ملفات PDF و DOC و DOCX المؤكدة بالتوقيع الرقمي.',
+      },
     );
   }
 
@@ -200,6 +230,12 @@ export class FileValidatorService {
       buf[11] === 0x50; // P
 
     return isRiff && isWebp;
+  }
+
+  private isGif(buf: Buffer): boolean {
+    if (buf.length < 6) return false;
+    const header = buf.subarray(0, 6).toString('ascii');
+    return header === 'GIF87a' || header === 'GIF89a';
   }
 
   /**

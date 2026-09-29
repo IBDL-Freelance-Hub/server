@@ -1,6 +1,8 @@
 import { Router } from 'express';
 import multer from 'multer';
+import path from 'path';
 import { validateRequest, requireAuth, registrationRateLimiter } from '../../../shared/middleware';
+import { ValidationError } from '../../../shared/errors';
 import {
   registerMemberSchema,
   checkDuplicateSchema,
@@ -11,11 +13,58 @@ import { MembersController } from './members.controller';
 const router = Router();
 const controller = new MembersController();
 
+const cvFileFilter: multer.Options['fileFilter'] = (_req, file, cb) => {
+  const ext = path.extname(file.originalname || '').toLowerCase();
+  const isImageMime = file.mimetype.toLowerCase().startsWith('image/');
+  const isImageExt = [
+    '.jpg',
+    '.jpeg',
+    '.png',
+    '.webp',
+    '.gif',
+    '.svg',
+    '.bmp',
+    '.ico',
+    '.tiff',
+    '.avif',
+  ].includes(ext);
+
+  if (isImageMime || isImageExt) {
+    return cb(
+      new ValidationError(
+        'Invalid CV file format. An image was uploaded instead of a CV document. Only PDF, DOC, and DOCX files verified by signature are accepted (UPL-02, UPL-14).',
+      ),
+    );
+  }
+
+  const allowedExts = ['.pdf', '.doc', '.docx'];
+  const allowedMimes = [
+    'application/pdf',
+    'application/msword',
+    'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+    'application/octet-stream',
+  ];
+
+  if (
+    !allowedExts.includes(ext) ||
+    (!allowedMimes.includes(file.mimetype) && file.mimetype !== '')
+  ) {
+    return cb(
+      new ValidationError(
+        'Invalid CV file format. Only PDF, DOC, and DOCX files verified by signature are accepted (UPL-02, UPL-14).',
+      ),
+    );
+  }
+
+  cb(null, true);
+};
+
 const uploadCv = multer({
   storage: multer.memoryStorage(),
   limits: {
     fileSize: 25 * 1024 * 1024, // 25 MB max ceiling for CV (UPL-14)
   },
+  fileFilter: cvFileFilter,
 });
 
 router.post(

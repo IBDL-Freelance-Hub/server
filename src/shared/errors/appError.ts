@@ -21,6 +21,21 @@ export class ValidationError extends AppError {
   }
 }
 
+export class FileValidationError extends ValidationError {
+  constructor(
+    message = 'Invalid CV file format. Only PDF, DOC, and DOCX files verified by signature are accepted.',
+    details?: unknown,
+  ) {
+    const errorDetails = details || {
+      en: 'Invalid CV file format. Only PDF, DOC, and DOCX files verified by signature are accepted.',
+      ar: 'صيغة السيرة الذاتية غير صالحة. نقبل فقط ملفات PDF و DOC و DOCX المؤكدة بالتوقيع الرقمي.',
+    };
+    super(message, errorDetails);
+    (this as unknown as { statusCode: number }).statusCode = 422;
+    (this as unknown as { code: string }).code = 'INVALID_FILE_TYPE';
+  }
+}
+
 export class AuthenticationError extends AppError {
   constructor(message = 'Authentication Failed', details?: unknown) {
     super(message, 401, 'UNAUTHENTICATED', details);
