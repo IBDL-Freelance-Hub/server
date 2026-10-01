@@ -1394,6 +1394,269 @@ const options: swaggerJsdoc.Options = {
           },
         },
       },
+      '/api/v1/services': {
+        get: {
+          tags: ['Core Hub Services'],
+          summary: 'List 12 Canonical Core Hub Services',
+          description:
+            'Retrieves the 12 Core Hub Services with server-calculated tier discounts (MEM-13) and Master complimentary inclusion.',
+          responses: {
+            '200': {
+              description: 'Catalog of 12 Core Hub Services',
+              content: {
+                'application/json': {
+                  schema: {
+                    type: 'object',
+                    properties: {
+                      success: { type: 'boolean', example: true },
+                      data: {
+                        type: 'array',
+                        items: {
+                          type: 'object',
+                          properties: {
+                            id: { type: 'string' },
+                            slug: { type: 'string', example: 'training-needs-analysis' },
+                            nameEn: {
+                              type: 'string',
+                              example: 'Training Needs Analysis (TNA) Assistance',
+                            },
+                            basePrice: { type: 'number', example: 150.0 },
+                            discountPercentage: { type: 'number', example: 15.0 },
+                            finalPrice: { type: 'number', example: 127.5 },
+                            isIncludedWithPlan: { type: 'boolean', example: false },
+                          },
+                        },
+                      },
+                    },
+                  },
+                },
+              },
+            },
+          },
+        },
+      },
+      '/api/v1/services/{slug}/request': {
+        post: {
+          tags: ['Core Hub Services'],
+          summary: 'Request a Core Hub Service',
+          description:
+            'Submits a request for a Core Hub Service. Master tier members receive 100% discount with immediate IN_REVIEW status.',
+          security: [{ cookieAuth: [] }, { bearerAuth: [] }],
+          parameters: [
+            {
+              name: 'slug',
+              in: 'path',
+              required: true,
+              schema: { type: 'string' },
+            },
+          ],
+          requestBody: {
+            required: false,
+            content: {
+              'application/json': {
+                schema: {
+                  type: 'object',
+                  properties: {
+                    customRequirements: { type: 'string' },
+                    intakeData: { type: 'object' },
+                  },
+                },
+              },
+            },
+          },
+          responses: {
+            '201': {
+              description: 'Service request created successfully',
+            },
+            '401': {
+              description: 'Authentication required',
+            },
+            '404': {
+              description: 'Service slug not found',
+            },
+          },
+        },
+      },
+      '/api/v1/shop/tools': {
+        get: {
+          tags: ['Diagnostic Tools Shop'],
+          summary: 'List Diagnostic Assessment Instruments',
+          description:
+            'Retrieves the 3 Diagnostic Assessment Instruments (PQP™, CPAT™, Management Drives®) with tier discounts and Master quarterly entitlement availability.',
+          responses: {
+            '200': {
+              description: 'Catalog of 3 Diagnostic Tools',
+            },
+          },
+        },
+      },
+      '/api/v1/shop/tools/{slug}/order': {
+        post: {
+          tags: ['Diagnostic Tools Shop'],
+          summary: 'Order a Diagnostic Assessment Instrument',
+          description:
+            'Orders a diagnostic assessment instrument. Enforces 1 usage per contractual quarter for Master members (MEM-14, MEM-16, MEM-76), falling back to 40% discount.',
+          security: [{ cookieAuth: [] }, { bearerAuth: [] }],
+          parameters: [
+            {
+              name: 'slug',
+              in: 'path',
+              required: true,
+              schema: { type: 'string' },
+            },
+          ],
+          requestBody: {
+            required: false,
+            content: {
+              'application/json': {
+                schema: {
+                  type: 'object',
+                  properties: {
+                    customRequirements: { type: 'string' },
+                    intakeData: {
+                      type: 'object',
+                      properties: {
+                        targetOrganization: { type: 'string' },
+                        participantCount: { type: 'integer' },
+                        assessmentEmail: { type: 'string', format: 'email' },
+                      },
+                    },
+                  },
+                },
+              },
+            },
+          },
+          responses: {
+            '201': {
+              description: 'Diagnostic tool order created successfully',
+            },
+            '401': {
+              description: 'Authentication required',
+            },
+            '404': {
+              description: 'Tool slug not found',
+            },
+          },
+        },
+      },
+      '/api/v1/members/requests': {
+        get: {
+          tags: ['Member Requests & Tracking'],
+          summary: 'List Authenticated Member Requests',
+          description:
+            'Returns paginated list of engagement requests for the authenticated member adhering to MEM-78f (no silent disappearance).',
+          security: [{ cookieAuth: [] }, { bearerAuth: [] }],
+          parameters: [
+            {
+              name: 'status',
+              in: 'query',
+              schema: {
+                type: 'string',
+                enum: [
+                  'PENDING_PAYMENT',
+                  'IN_REVIEW',
+                  'IN_PROGRESS',
+                  'COMPLETED',
+                  'CANCELLED',
+                  'REJECTED',
+                ],
+              },
+            },
+            {
+              name: 'category',
+              in: 'query',
+              schema: {
+                type: 'string',
+                enum: ['CORE_SERVICE', 'DIAGNOSTIC_TOOL'],
+              },
+            },
+            {
+              name: 'page',
+              in: 'query',
+              schema: { type: 'integer', default: 1 },
+            },
+            {
+              name: 'limit',
+              in: 'query',
+              schema: { type: 'integer', default: 20 },
+            },
+          ],
+          responses: {
+            '200': {
+              description: 'Paginated list of member requests',
+            },
+            '401': {
+              description: 'Authentication required',
+            },
+          },
+        },
+      },
+      '/api/v1/members/requests/{referenceCode}': {
+        get: {
+          tags: ['Member Requests & Tracking'],
+          summary: 'Get Member Request Details',
+          description:
+            'Retrieves details for a specific request by referenceCode with strict tenant isolation (MEM-78).',
+          security: [{ cookieAuth: [] }, { bearerAuth: [] }],
+          parameters: [
+            {
+              name: 'referenceCode',
+              in: 'path',
+              required: true,
+              schema: { type: 'string', example: 'REQ-2026-A8K2' },
+            },
+          ],
+          responses: {
+            '200': {
+              description: 'Engagement request details',
+            },
+            '401': {
+              description: 'Authentication required',
+            },
+            '404': {
+              description: 'Request not found or unauthorized access',
+            },
+          },
+        },
+      },
+      '/api/v1/members/requests/{referenceCode}/cancel': {
+        post: {
+          tags: ['Member Requests & Tracking'],
+          summary: 'Cancel Member Engagement Request',
+          description:
+            'Cancels a PENDING_PAYMENT or IN_REVIEW engagement request with audit trail (MEM-78f).',
+          security: [{ cookieAuth: [] }, { bearerAuth: [] }],
+          parameters: [
+            {
+              name: 'referenceCode',
+              in: 'path',
+              required: true,
+              schema: { type: 'string', example: 'REQ-2026-A8K2' },
+            },
+          ],
+          requestBody: {
+            required: false,
+            content: {
+              'application/json': {
+                schema: {
+                  type: 'object',
+                  properties: {
+                    reason: { type: 'string' },
+                  },
+                },
+              },
+            },
+          },
+          responses: {
+            '200': {
+              description: 'Request cancelled successfully',
+            },
+            '422': {
+              description: 'Cannot cancel request in terminal state',
+            },
+          },
+        },
+      },
     },
   },
   apis: [],

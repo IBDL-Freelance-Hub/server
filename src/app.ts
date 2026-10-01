@@ -17,6 +17,10 @@ import { authRouter } from './modules/auth/presentation/auth.routes';
 import { filesRouter } from './modules/files/presentation/files.routes';
 import { membershipRouter } from './modules/membership/presentation/membership.routes';
 import { directoryRouter } from './modules/directory/presentation/directory.routes';
+import { servicesRouter } from './modules/requests/presentation/services.routes';
+import { shopRouter } from './modules/requests/presentation/shop.routes';
+import { requestsRouter } from './modules/requests/presentation/requests.routes';
+import adminRequestsRouter from './modules/requests/presentation/admin-requests.routes';
 
 const app: Express = express();
 
@@ -132,6 +136,10 @@ app.use('/api/v1/auth', authRouter);
 app.use('/api/v1/files', filesRouter);
 app.use('/api/v1/memberships', membershipRouter);
 app.use('/api/v1/directory', directoryRouter);
+app.use('/api/v1/services', servicesRouter);
+app.use('/api/v1/shop', shopRouter);
+app.use('/api/v1/requests', requestsRouter);
+app.use('/api/v1/admin/requests', adminRequestsRouter);
 
 // 11. Catch-All 404 Route Handler
 app.use((req: Request, _res: Response, next: NextFunction) => {
