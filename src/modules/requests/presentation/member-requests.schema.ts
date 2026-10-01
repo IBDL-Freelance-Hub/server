@@ -30,5 +30,10 @@ export const payMemberRequestSchema = z.object({
   gatewayToken: z.string().optional(),
 });
 
+export const respondInfoMemberRequestSchema = z.object({
+  responseNotes: z.string().min(1, 'responseNotes is required').max(2000),
+  updatedBrief: z.record(z.any()).optional(),
+});
+
 export type ListMemberRequestsQueryInput = z.infer<typeof listMemberRequestsQuerySchema>;
 export type CancelMemberRequestInput = z.infer<typeof cancelMemberRequestSchema>;

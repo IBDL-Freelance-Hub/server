@@ -6,6 +6,7 @@ import {
   requestIdOrRefParamSchema,
   cancelMemberRequestSchema,
   payMemberRequestSchema,
+  respondInfoMemberRequestSchema,
 } from './member-requests.schema';
 
 const router = Router();
@@ -47,6 +48,17 @@ router.post(
     body: payMemberRequestSchema,
   }),
   controller.payRequest,
+);
+
+// POST /api/v1/requests/:id/respond-info — Respond to info request
+router.post(
+  '/:id/respond-info',
+  requireAuth,
+  validateRequest({
+    params: requestIdOrRefParamSchema,
+    body: respondInfoMemberRequestSchema,
+  }),
+  controller.respondInfo,
 );
 
 export const memberRequestsRouter = router;

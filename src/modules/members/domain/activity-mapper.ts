@@ -151,6 +151,13 @@ export const MEMBER_ACTIVITY_MAP: Record<string, ActivityTemplate> = {
     },
     tone: 'info',
   },
+  REQUEST_INFO_PROVIDED: {
+    text: {
+      en: 'Information provided for request',
+      ar: 'تم تقديم المعلومات المطلوبة للطلب',
+    },
+    tone: 'info',
+  },
   REQUEST_APPROVED: {
     text: {
       en: 'Request approved',
