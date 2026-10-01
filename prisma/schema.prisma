@@ -70,6 +70,34 @@ enum AssessmentCredentialStatus {
   EXHAUSTED
 }
 
+enum PricingModel {
+  IN_HUB
+  PERCENTAGE
+  INCLUDED_OR_QUOTED
+  QUOTED
+  FIXED
+  FREE_THEN_PAID
+  NONE
+}
+
+enum CatalogItemCategory {
+  CORE_SERVICE
+  DIAGNOSTIC_TOOL
+  BUSINESS_SIMULATION
+  PROFESSIONAL_RECOGNITION
+}
+
+enum EngagementRequestStatus {
+  SUBMITTED
+  UNDER_REVIEW
+  AWAITING_RESPONSE
+  AWAITING_PAYMENT
+  PAYMENT_CONFIRMED
+  FULFILLED
+  REJECTED
+  CANCELLED
+}
+
 // Models
 
 model User {
@@ -88,6 +116,7 @@ model User {
   sessions           Session[]
   verificationTokens VerificationToken[]
   passwordHistory    PasswordHistory[]
+  notifications      Notification[]
 
   @@index([status, createdAt])
 }
@@ -116,6 +145,7 @@ model Member {
   user                  User         @relation(fields: [userId], references: [id], onDelete: Restrict)
   memberships           Membership[]
   files                 File[]
+  engagementRequests    EngagementRequest[]
 
   @@index([country, directoryOptIn, profileCompletionRate])
   @@index([directoryOptIn])
@@ -295,5 +325,113 @@ model PasswordHistory {
 
   user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
+  @@index([userId, createdAt(sort: Desc)])
+}
+
+model CatalogItem {
+  id            String              @id @default(uuid())
+  slug          String              @unique
+  category      CatalogItemCategory
+  pricingModel  PricingModel        @default(QUOTED)
+  packageLevel  String?             // e.g. "LEVEL_1", "LEVEL_2", "LEVEL_3"
+  nameEn        String
+  nameAr        String?
+  descriptionEn String?             @db.Text
+  descriptionAr String?             @db.Text
+  basePrice     Int                 @default(0) // Minor units (e.g. cents)
+  currency      String              @default("USD")
+  percentageRate Decimal?           @db.Decimal(5, 2) // e.g. 5.00 for percentage model
+  isActive      Boolean             @default(true)
+  metadata      Json?
+  createdAt     DateTime            @default(now())
+  updatedAt     DateTime            @updatedAt
+  requests      EngagementRequest[]
+
+  @@index([category, isActive])
+  @@index([slug])
+  @@index([pricingModel])
+}
+
+model EngagementRequest {
+  id                        String                  @id @default(uuid())
+  referenceCode             String                  @unique // REQ-YYYY-0nnn
+  memberId                  String
+  catalogItemId             String
+  category                  CatalogItemCategory
+  status                    EngagementRequestStatus @default(SUBMITTED)
+  pricingModel              PricingModel            @default(QUOTED)
+
+  // Snapshot at submission (SEC-33)
+  tierAtRequest             MembershipTier
+  membershipStatusAtRequest MembershipStatus
+  standardPrice             Int?                    // Minor units (cents)
+  percentageRate            Decimal?                @db.Decimal(5, 2)
+
+  // Member Input / Brief
+  brief                     Json?
+  customRequirements        String?                 @db.Text
+  intakeData                Json?
+  acknowledgement           Boolean                 @default(false)
+
+  // Approved Price Breakdown (Calculated upon admin approval)
+  baseAmount                Int?                    // Project value for percentage or quoted base (in minor units / cents)
+  basePrice                 Int?                    // standard price or 5% of baseAmount (in minor units / cents)
+  discountPercentage        Decimal?                @db.Decimal(5, 2)
+  discountAmount            Int?                    // in minor units / cents
+  finalPrice                Int?                    // in minor units / cents
+  currency                  String                  @default("USD")
+  isQuarterlyEntitlement    Boolean                 @default(false)
+  quarterIndex              Int?
+  membershipYear            Int?
+
+  // Payment Tracking
+  paymentReference          String?
+  paidAt                    DateTime?
+
+  // Admin & Lifecycle Tracking
+  adminNotes                String?                 @db.Text
+  reviewNotes               String?                 @db.Text
+  cancellationReason        String?                 @db.Text
+  rejectionReason           String?                 @db.Text
+  infoRequestedAt           DateTime?
+  approvedAt                DateTime?
+  fulfilledAt               DateTime?
+  cancelledAt               DateTime?
+  rejectedAt                DateTime?
+  createdAt                 DateTime                @default(now())
+  updatedAt                 DateTime                @updatedAt
+
+  member                    Member                  @relation(fields: [memberId], references: [id], onDelete: Restrict)
+  catalogItem               CatalogItem             @relation(fields: [catalogItemId], references: [id], onDelete: Restrict)
+
+  @@index([memberId, status])
+  @@index([memberId, catalogItemId, status])
+  @@index([memberId, createdAt(sort: Desc)])
+  @@index([referenceCode])
+  @@index([category, status])
+  @@index([memberId, isQuarterlyEntitlement, quarterIndex, membershipYear], map: "EngagementRequest_entitlement_idx")
+}
+
+model RequestSequenceCounter {
+  year      Int      @id
+  lastValue Int      @default(0)
+  updatedAt DateTime @updatedAt
+}
+
+model Notification {
+  id        String   @id @default(uuid())
+  userId    String
+  titleEn   String
+  titleAr   String
+  bodyEn    String   @db.Text
+  bodyAr    String   @db.Text
+  type      String
+  isRead    Boolean  @default(false)
+  link      String?
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, isRead])
   @@index([userId, createdAt(sort: Desc)])
 }
