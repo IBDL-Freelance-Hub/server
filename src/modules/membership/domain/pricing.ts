@@ -13,6 +13,20 @@ export const MEMBERSHIP_TIER_HIERARCHY: Record<MembershipTier, number> = {
 };
 
 /**
+ * Authoritative single-source-of-truth membership tier discount rates (MEM-13, SEC-33).
+ * Essential: 15%, Professional: 30%, Master: 40%
+ */
+export const TIER_DISCOUNT_RATES: Record<MembershipTier, number> = {
+  [MembershipTier.ESSENTIAL]: 15.0,
+  [MembershipTier.PROFESSIONAL]: 30.0,
+  [MembershipTier.MASTER]: 40.0,
+};
+
+export function getTierDiscountRate(tier: MembershipTier): number {
+  return TIER_DISCOUNT_RATES[tier] ?? 15.0;
+}
+
+/**
  * Returns the authoritative server-configured annual price for a membership tier (SEC-33).
  */
 export function getTierPrice(tier: MembershipTier): number {

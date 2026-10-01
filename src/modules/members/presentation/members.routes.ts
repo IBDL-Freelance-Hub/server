@@ -133,4 +133,8 @@ router.patch(
   controller.updateProfile,
 );
 
+// Member Requests & Workflow Tracking (MEM-78, MEM-78f)
+import { memberRequestsRouter } from '../../requests/presentation/member-requests.routes';
+router.use('/requests', memberRequestsRouter);
+
 export const membersRouter = router;

@@ -130,6 +130,62 @@ export const MEMBER_ACTIVITY_MAP: Record<string, ActivityTemplate> = {
     },
     tone: 'neutral',
   },
+  REQUEST_SUBMITTED: {
+    text: {
+      en: 'Request submitted',
+      ar: 'تم تقديم الطلب',
+    },
+    tone: 'info',
+  },
+  REQUEST_UNDER_REVIEW: {
+    text: {
+      en: 'Request under review',
+      ar: 'الطلب قيد المراجعة',
+    },
+    tone: 'info',
+  },
+  REQUEST_INFO_REQUESTED: {
+    text: {
+      en: 'Action required on request',
+      ar: 'مطلوب إجراء بخصوص الطلب',
+    },
+    tone: 'info',
+  },
+  REQUEST_APPROVED: {
+    text: {
+      en: 'Request approved',
+      ar: 'تمت الموافقة على الطلب',
+    },
+    tone: 'positive',
+  },
+  REQUEST_PAYMENT_CONFIRMED: {
+    text: {
+      en: 'Payment confirmed',
+      ar: 'تم تأكيد الدفع',
+    },
+    tone: 'positive',
+  },
+  REQUEST_FULFILLED: {
+    text: {
+      en: 'Request fulfilled',
+      ar: 'تم تنفيذ الطلب',
+    },
+    tone: 'positive',
+  },
+  REQUEST_REJECTED: {
+    text: {
+      en: 'Request rejected',
+      ar: 'تم رفض الطلب',
+    },
+    tone: 'neutral',
+  },
+  REQUEST_CANCELLED: {
+    text: {
+      en: 'Request cancelled',
+      ar: 'تم إلغاء الطلب',
+    },
+    tone: 'neutral',
+  },
 };
 
 /**
