@@ -1,6 +1,6 @@
 import { PrismaClient, EngagementRequestStatus } from '@prisma/client';
 import { prisma as defaultPrisma } from '../../../shared/providers';
-import { NotFoundError, BusinessRuleError } from '../../../shared/errors';
+import { NotFoundError, BusinessRuleError, ConflictError } from '../../../shared/errors';
 import { canMemberCancelRequest } from '../domain/request-state-machine';
 import {
   IRequestNotificationService,
@@ -61,67 +61,87 @@ export class CancelMemberRequestUseCase {
     const cancelledAt = new Date();
     const cancellationReason = input.reason?.trim() || 'Cancelled by member.';
 
-    const updated = await this.prisma.$transaction(async (tx) => {
-      const rec = await tx.engagementRequest.update({
-        where: { id: request.id },
-        data: {
-          status: EngagementRequestStatus.CANCELLED,
-          cancelledAt,
-          cancellationReason,
-        },
-      });
-
-      // 1. Structured immutable audit log for member self-cancellation (SEC-33)
-      await tx.auditLog.create({
-        data: {
-          actorId: userId,
-          actorRole: 'MEMBER',
-          action: 'CANCEL_ENGAGEMENT_REQUEST',
-          resource: 'EngagementRequest',
-          resourceId: request.id,
-          ipAddress: meta?.ipAddress,
-          requestId: meta?.requestId,
-          reason: cancellationReason,
-          previousState: { status: request.status },
-          newState: {
+    const updated = await this.prisma.$transaction(
+      async (tx) => {
+        const updateResult = await tx.engagementRequest.updateMany({
+          where: { id: request.id, status: request.status },
+          data: {
             status: EngagementRequestStatus.CANCELLED,
+            cancelledAt,
             cancellationReason,
-            cancelledAt: cancelledAt.toISOString(),
           },
-        },
-      });
+        });
 
-      // 2. Member Activity Feed Timeline Entry (ACT-58, mapped in activity-mapper.ts)
-      await tx.auditLog.create({
-        data: {
-          actorId: userId,
-          actorRole: 'MEMBER',
-          action: 'REQUEST_CANCELLED',
-          resource: 'EngagementRequest',
-          resourceId: request.id,
-          reason: cancellationReason,
-          previousState: { status: request.status },
-          newState: {
-            status: EngagementRequestStatus.CANCELLED,
+        if (updateResult.count === 0) {
+          throw new ConflictError(
+            `Request status was updated concurrently. Expected '${request.status}' but it has changed. Please refresh and try again.`,
+          );
+        }
+
+        // 1. Structured immutable audit log for member self-cancellation (SEC-33)
+        await tx.auditLog.create({
+          data: {
+            actorId: userId,
+            actorRole: 'MEMBER',
+            action: 'CANCEL_ENGAGEMENT_REQUEST',
+            resource: 'EngagementRequest',
+            resourceId: request.id,
+            ipAddress: meta?.ipAddress,
+            requestId: meta?.requestId,
+            reason: cancellationReason,
+            previousState: { status: request.status },
+            newState: {
+              status: EngagementRequestStatus.CANCELLED,
+              cancellationReason,
+              cancelledAt: cancelledAt.toISOString(),
+            },
           },
-        },
-      });
+        });
 
-      return rec;
-    });
+        // 2. Member Activity Feed Timeline Entry (ACT-58, mapped in activity-mapper.ts)
+        await tx.auditLog.create({
+          data: {
+            actorId: userId,
+            actorRole: 'MEMBER',
+            action: 'REQUEST_CANCELLED',
+            resource: 'EngagementRequest',
+            resourceId: request.id,
+            reason: cancellationReason,
+            previousState: { status: request.status },
+            newState: {
+              status: EngagementRequestStatus.CANCELLED,
+            },
+          },
+        });
 
-    // 3. Dispatch member notification
-    await this.notificationSvc.dispatchNotification({
-      userId,
-      memberEmail: request.member.user?.email,
-      referenceCode: request.referenceCode,
-      type: 'REQUEST_CANCELLED',
-      titleEn: 'Request Cancelled',
-      titleAr: 'تم إلغاء الطلب',
-      messageEn: `Your request (${request.referenceCode}) has been cancelled.`,
-      messageAr: `تم إلغاء طلبك (${request.referenceCode}) بنجاح.`,
-      metadata: { requestId: request.id, status: EngagementRequestStatus.CANCELLED },
-    });
+        // 3. Persist Notification in DB
+        const notifInput = {
+          userId,
+          memberEmail: request.member.user?.email,
+          referenceCode: request.referenceCode,
+          type: 'REQUEST_CANCELLED',
+          titleEn: 'Request Cancelled',
+          titleAr: 'تم إلغاء الطلب',
+          messageEn: `Your request (${request.referenceCode}) has been cancelled.`,
+          messageAr: `تم إلغاء طلبك (${request.referenceCode}) بنجاح.`,
+          metadata: { requestId: request.id, status: EngagementRequestStatus.CANCELLED },
+        };
+        await this.notificationSvc.saveInAppNotification(tx, notifInput);
+
+        return {
+          id: request.id,
+          referenceCode: request.referenceCode,
+          status: EngagementRequestStatus.CANCELLED,
+          cancellationReason,
+          cancelledAt,
+          notifInput,
+        };
+      },
+      { timeout: 30000 },
+    );
+
+    // 4. Dispatch Email Outside Transaction
+    this.notificationSvc.dispatchEmailOnly(updated.notifInput).catch(() => {});
 
     return {
       id: updated.id,

@@ -18,6 +18,33 @@ const options: swaggerJsdoc.Options = {
         description: 'Current Environment Server',
       },
     ],
+    tags: [
+      { name: 'Health', description: 'System health & uptime diagnostics' },
+      { name: 'Auth', description: 'Authentication, session management & password security' },
+      { name: 'Members', description: 'Member registration, profile management & dashboards' },
+      { name: 'Membership', description: 'Membership tiers & upgrade checkout' },
+      { name: 'Files', description: 'Secure file upload & binary streaming' },
+      { name: 'Directory', description: 'Public consultant & trainer directory search' },
+      { name: 'Core Hub Services', description: '12 canonical hub service requests' },
+      {
+        name: 'Diagnostic Tools Shop',
+        description: 'Diagnostic assessment instruments catalog & ordering',
+      },
+      {
+        name: 'Member Requests & Tracking',
+        description: 'Member engagement request workflows and tracking',
+      },
+      {
+        name: 'Admin Requests',
+        description: 'Staff operations, review, pricing approval & fulfillment',
+      },
+      { name: 'Notifications', description: 'In-app notification feed & status tracking' },
+      {
+        name: 'Transactions & Invoices',
+        description: 'Financial ledger & itemized invoices for members',
+      },
+      { name: 'Admin Transactions', description: 'Staff accounting and ledger lookup' },
+    ],
     components: {
       securitySchemes: {
         cookieAuth: {
@@ -665,6 +692,143 @@ const options: swaggerJsdoc.Options = {
             data: { $ref: '#/components/schemas/PublicTrainerProfile' },
           },
         },
+        SubmitUnifiedRequest: {
+          type: 'object',
+          required: ['itemSlug', 'acknowledgement'],
+          properties: {
+            itemSlug: { type: 'string', example: 'pqp-assessment' },
+            brief: {
+              type: 'object',
+              example: { clientName: 'Acme Corp', projectScope: 'Leadership Assessment' },
+            },
+            acknowledgement: { type: 'boolean', example: true },
+            customRequirements: {
+              type: 'string',
+              example: 'Need assessment delivered in French.',
+            },
+          },
+        },
+        RespondInfoMemberRequest: {
+          type: 'object',
+          required: ['responseNotes'],
+          properties: {
+            responseNotes: {
+              type: 'string',
+              example: 'Updated project requirements attached.',
+            },
+            updatedBrief: {
+              type: 'object',
+              example: { attendeeCount: 25 },
+            },
+          },
+        },
+        PayMemberRequest: {
+          type: 'object',
+          properties: {
+            paymentMethodId: { type: 'string', example: 'pm_card_visa' },
+            gatewayToken: { type: 'string', example: 'tok_12345' },
+            paymentReference: { type: 'string', example: 'PAY-GATEWAY-7890' },
+          },
+        },
+        AdminRequestInfoInput: {
+          type: 'object',
+          required: ['reviewNotes'],
+          properties: {
+            reviewNotes: {
+              type: 'string',
+              minLength: 5,
+              example: 'Please provide the target delivery date and audience size.',
+            },
+          },
+        },
+        AdminRejectRequestInput: {
+          type: 'object',
+          required: ['rejectionReason'],
+          properties: {
+            rejectionReason: {
+              type: 'string',
+              minLength: 5,
+              example: 'Service requested is outside current geographic delivery scope.',
+            },
+          },
+        },
+        AdminApproveRequestInput: {
+          type: 'object',
+          properties: {
+            baseAmount: {
+              type: 'integer',
+              description: 'Base price in minor currency units (cents)',
+              example: 15000,
+            },
+            adminNotes: {
+              type: 'string',
+              example: 'Approved with standard professional tier discount.',
+            },
+          },
+        },
+        AdminFulfillRequestInput: {
+          type: 'object',
+          properties: {
+            deliveryNotes: {
+              type: 'string',
+              example: 'Credentials generated and sent to member.',
+            },
+            customAccessUrl: {
+              type: 'string',
+              format: 'uri',
+              example: 'https://portal.ibdl.net/assessments/test-token',
+            },
+          },
+        },
+        AdminMarkPaidInput: {
+          type: 'object',
+          properties: {
+            paymentRef: { type: 'string', example: 'BANK-TRANSFER-9988' },
+            paymentReference: { type: 'string', example: 'BANK-TRANSFER-9988' },
+            paidAmount: { type: 'integer', description: 'Amount in cents', example: 8500 },
+            adminNotes: { type: 'string', example: 'Verified wire receipt from National Bank.' },
+          },
+        },
+        NotificationItem: {
+          type: 'object',
+          properties: {
+            id: { type: 'string', format: 'uuid' },
+            userId: { type: 'string' },
+            referenceCode: { type: 'string', example: 'REQ-2026-A8K2' },
+            type: { type: 'string', example: 'REQUEST_UNDER_REVIEW' },
+            titleEn: { type: 'string', example: 'Request Under Review' },
+            titleAr: { type: 'string', example: 'الطلب قيد المراجعة' },
+            messageEn: { type: 'string', example: 'Your request is under review.' },
+            messageAr: { type: 'string', example: 'طلبك قيد المراجعة حالياً.' },
+            link: { type: 'string', nullable: true },
+            isRead: { type: 'boolean', example: false },
+            createdAt: { type: 'string', format: 'date-time' },
+          },
+        },
+        TransactionItem: {
+          type: 'object',
+          properties: {
+            id: { type: 'string', format: 'uuid' },
+            invoiceNumber: { type: 'string', example: 'INV-2026-00001' },
+            userId: { type: 'string' },
+            sourceType: {
+              type: 'string',
+              enum: ['REQUEST', 'SHOP_ORDER', 'SUBSCRIPTION'],
+              example: 'REQUEST',
+            },
+            sourceId: { type: 'string', example: 'req_uuid_123' },
+            amountCents: { type: 'integer', example: 8500 },
+            currency: { type: 'string', example: 'USD' },
+            status: {
+              type: 'string',
+              enum: ['PENDING', 'CONFIRMED', 'FAILED', 'REFUNDED'],
+              example: 'CONFIRMED',
+            },
+            paymentReference: { type: 'string', example: 'TXN-BANK-998822' },
+            paidAt: { type: 'string', format: 'date-time', nullable: true },
+            createdAt: { type: 'string', format: 'date-time' },
+          },
+        },
       },
     },
     paths: {
@@ -992,6 +1156,31 @@ const options: swaggerJsdoc.Options = {
             '201': { description: 'Profile photo uploaded successfully' },
             '400': { description: 'Invalid image format or size exceeded' },
             '401': { description: 'Unauthorized' },
+          },
+        },
+        delete: {
+          summary: 'Delete Profile Photo',
+          description:
+            'Permanently removes current profile photo for the authenticated member, superseding active storage records.',
+          tags: ['Files'],
+          security: [{ cookieAuth: [] }, { bearerAuth: [] }],
+          responses: {
+            '200': {
+              description: 'Profile photo removed successfully',
+              content: {
+                'application/json': {
+                  schema: {
+                    type: 'object',
+                    properties: {
+                      success: { type: 'boolean', example: true },
+                      message: { type: 'string', example: 'Profile photo removed successfully' },
+                    },
+                  },
+                },
+              },
+            },
+            '401': { description: 'Unauthorized' },
+            '404': { description: 'Member profile not found' },
           },
         },
       },
@@ -1477,6 +1666,69 @@ const options: swaggerJsdoc.Options = {
           },
         },
       },
+      '/api/v1/shop/items': {
+        get: {
+          tags: ['Diagnostic Tools Shop'],
+          summary: 'List Unified Shop Catalog Items',
+          description:
+            'Retrieves active catalog items (diagnostic assessment instruments, core hub services, simulations) with tier discounts and availability status.',
+          parameters: [
+            {
+              name: 'kind',
+              in: 'query',
+              description: 'Filter by item category type',
+              schema: {
+                type: 'string',
+                enum: ['tool', 'service'],
+              },
+            },
+            {
+              name: 'search',
+              in: 'query',
+              description: 'Search by item title or description in English or Arabic',
+              schema: { type: 'string' },
+            },
+          ],
+          responses: {
+            '200': {
+              description: 'List of shop catalog items',
+              content: {
+                'application/json': {
+                  schema: {
+                    type: 'object',
+                    properties: {
+                      success: { type: 'boolean', example: true },
+                      data: {
+                        type: 'array',
+                        items: {
+                          type: 'object',
+                          properties: {
+                            id: { type: 'string' },
+                            slug: { type: 'string', example: 'pqp-assessment' },
+                            category: { type: 'string', example: 'DIAGNOSTIC_TOOL' },
+                            nameEn: {
+                              type: 'string',
+                              example: 'PQP™ Professional Quality Profile',
+                            },
+                            nameAr: { type: 'string' },
+                            descriptionEn: { type: 'string' },
+                            descriptionAr: { type: 'string' },
+                            pricingModel: { type: 'string', example: 'FIXED' },
+                            priceMinor: { type: 'integer', example: 10000 },
+                            formattedPrice: { type: 'string', example: '$100.00' },
+                            tierDiscountPercentage: { type: 'integer', example: 15 },
+                            isEligibleMasterQuarterly: { type: 'boolean', example: false },
+                          },
+                        },
+                      },
+                    },
+                  },
+                },
+              },
+            },
+          },
+        },
+      },
       '/api/v1/shop/tools': {
         get: {
           tags: ['Diagnostic Tools Shop'],
@@ -1653,6 +1905,942 @@ const options: swaggerJsdoc.Options = {
             },
             '422': {
               description: 'Cannot cancel request in terminal state',
+            },
+          },
+        },
+      },
+      '/api/v1/members/requests/{referenceCode}/respond-info': {
+        post: {
+          tags: ['Member Requests & Tracking'],
+          summary: 'Respond to Information Request (Member Subroute)',
+          description:
+            'Submits member response notes and optional updated brief for a request in AWAITING_RESPONSE status.',
+          security: [{ cookieAuth: [] }, { bearerAuth: [] }],
+          parameters: [
+            {
+              name: 'referenceCode',
+              in: 'path',
+              required: true,
+              schema: { type: 'string', example: 'REQ-2026-A8K2' },
+            },
+          ],
+          requestBody: {
+            required: true,
+            content: {
+              'application/json': {
+                schema: { $ref: '#/components/schemas/RespondInfoMemberRequest' },
+              },
+            },
+          },
+          responses: {
+            '200': { description: 'Response submitted successfully' },
+            '400': { description: 'Validation failed' },
+            '401': { description: 'Authentication required' },
+            '422': { description: 'Invalid state for response' },
+          },
+        },
+      },
+      '/api/v1/members/requests/{referenceCode}/pay': {
+        post: {
+          tags: ['Member Requests & Tracking'],
+          summary: 'Pay for Member Request (Member Subroute)',
+          description:
+            'Initiates payment for an approved request in AWAITING_PAYMENT status and generates invoice.',
+          security: [{ cookieAuth: [] }, { bearerAuth: [] }],
+          parameters: [
+            {
+              name: 'referenceCode',
+              in: 'path',
+              required: true,
+              schema: { type: 'string', example: 'REQ-2026-A8K2' },
+            },
+          ],
+          requestBody: {
+            required: false,
+            content: {
+              'application/json': {
+                schema: { $ref: '#/components/schemas/PayMemberRequest' },
+              },
+            },
+          },
+          responses: {
+            '200': { description: 'Payment recorded and confirmed' },
+            '400': { description: 'Validation error' },
+            '401': { description: 'Authentication required' },
+            '422': { description: 'Request not in AWAITING_PAYMENT state' },
+          },
+        },
+      },
+      '/api/v1/requests': {
+        post: {
+          tags: ['Member Requests & Tracking'],
+          summary: 'Submit Unified Engagement Request',
+          description:
+            'Submits a unified engagement request for a diagnostic tool or core hub service with brief data and mandatory acknowledgement (REQ-14, SEC-33).',
+          security: [{ cookieAuth: [] }, { bearerAuth: [] }],
+          requestBody: {
+            required: true,
+            content: {
+              'application/json': {
+                schema: { $ref: '#/components/schemas/SubmitUnifiedRequest' },
+              },
+            },
+          },
+          responses: {
+            '201': {
+              description: 'Engagement request submitted successfully',
+            },
+            '400': {
+              description: 'Validation error or brief exceeds 50KB limit',
+            },
+            '401': {
+              description: 'Authentication required',
+            },
+            '404': {
+              description: 'Catalog item slug not found',
+            },
+            '409': {
+              description: 'Active open request already exists for this item',
+            },
+            '429': {
+              description: 'Rate limit exceeded',
+            },
+          },
+        },
+        get: {
+          tags: ['Member Requests & Tracking'],
+          summary: 'List Member Engagement Requests',
+          description:
+            'Returns paginated list of engagement requests for the authenticated member adhering to MEM-78f.',
+          security: [{ cookieAuth: [] }, { bearerAuth: [] }],
+          parameters: [
+            {
+              name: 'status',
+              in: 'query',
+              schema: {
+                type: 'string',
+                enum: [
+                  'PENDING_PAYMENT',
+                  'SUBMITTED',
+                  'UNDER_REVIEW',
+                  'AWAITING_RESPONSE',
+                  'AWAITING_PAYMENT',
+                  'PAYMENT_CONFIRMED',
+                  'FULFILLED',
+                  'CANCELLED',
+                  'REJECTED',
+                ],
+              },
+            },
+            {
+              name: 'category',
+              in: 'query',
+              schema: {
+                type: 'string',
+                enum: [
+                  'CORE_SERVICE',
+                  'DIAGNOSTIC_TOOL',
+                  'BUSINESS_SIMULATION',
+                  'PROFESSIONAL_RECOGNITION',
+                ],
+              },
+            },
+            {
+              name: 'page',
+              in: 'query',
+              schema: { type: 'integer', default: 1 },
+            },
+            {
+              name: 'limit',
+              in: 'query',
+              schema: { type: 'integer', default: 20 },
+            },
+          ],
+          responses: {
+            '200': {
+              description: 'Paginated list of member requests',
+            },
+            '401': {
+              description: 'Authentication required',
+            },
+          },
+        },
+      },
+      '/api/v1/requests/{id}': {
+        get: {
+          tags: ['Member Requests & Tracking'],
+          summary: 'Get Member Request Details',
+          description:
+            'Retrieves details for a specific request by ID or reference code with tenant isolation (MEM-78).',
+          security: [{ cookieAuth: [] }, { bearerAuth: [] }],
+          parameters: [
+            {
+              name: 'id',
+              in: 'path',
+              required: true,
+              description: 'Internal request UUID or referenceCode (e.g. REQ-2026-A8K2)',
+              schema: { type: 'string', example: 'REQ-2026-A8K2' },
+            },
+          ],
+          responses: {
+            '200': {
+              description: 'Engagement request details',
+            },
+            '401': {
+              description: 'Authentication required',
+            },
+            '404': {
+              description: 'Request not found or unauthorized access',
+            },
+          },
+        },
+      },
+      '/api/v1/requests/{id}/cancel': {
+        post: {
+          tags: ['Member Requests & Tracking'],
+          summary: 'Cancel Member Engagement Request',
+          description:
+            'Cancels a PENDING_PAYMENT, SUBMITTED, or UNDER_REVIEW engagement request with audit trail (MEM-78f).',
+          security: [{ cookieAuth: [] }, { bearerAuth: [] }],
+          parameters: [
+            {
+              name: 'id',
+              in: 'path',
+              required: true,
+              schema: { type: 'string', example: 'REQ-2026-A8K2' },
+            },
+          ],
+          requestBody: {
+            required: false,
+            content: {
+              'application/json': {
+                schema: {
+                  type: 'object',
+                  properties: {
+                    reason: { type: 'string', example: 'No longer needed' },
+                  },
+                },
+              },
+            },
+          },
+          responses: {
+            '200': {
+              description: 'Request cancelled successfully',
+            },
+            '401': {
+              description: 'Authentication required',
+            },
+            '422': {
+              description: 'Cannot cancel request in terminal state',
+            },
+          },
+        },
+      },
+      '/api/v1/requests/{id}/respond-info': {
+        post: {
+          tags: ['Member Requests & Tracking'],
+          summary: 'Respond to Information Request',
+          description:
+            'Provides additional details and optional updated brief when request is in AWAITING_RESPONSE state.',
+          security: [{ cookieAuth: [] }, { bearerAuth: [] }],
+          parameters: [
+            {
+              name: 'id',
+              in: 'path',
+              required: true,
+              schema: { type: 'string', example: 'REQ-2026-A8K2' },
+            },
+          ],
+          requestBody: {
+            required: true,
+            content: {
+              'application/json': {
+                schema: { $ref: '#/components/schemas/RespondInfoMemberRequest' },
+              },
+            },
+          },
+          responses: {
+            '200': {
+              description: 'Information submitted and request returned to review',
+            },
+            '400': {
+              description: 'Validation failed',
+            },
+            '401': {
+              description: 'Authentication required',
+            },
+            '422': {
+              description: 'Request is not awaiting member response',
+            },
+          },
+        },
+      },
+      '/api/v1/requests/{id}/pay': {
+        post: {
+          tags: ['Member Requests & Tracking'],
+          summary: 'Pay for Approved Request',
+          description:
+            'Processes payment for a request in AWAITING_PAYMENT state and transitions to PAYMENT_CONFIRMED.',
+          security: [{ cookieAuth: [] }, { bearerAuth: [] }],
+          parameters: [
+            {
+              name: 'id',
+              in: 'path',
+              required: true,
+              schema: { type: 'string', example: 'REQ-2026-A8K2' },
+            },
+          ],
+          requestBody: {
+            required: false,
+            content: {
+              'application/json': {
+                schema: { $ref: '#/components/schemas/PayMemberRequest' },
+              },
+            },
+          },
+          responses: {
+            '200': {
+              description: 'Payment successful, invoice generated',
+            },
+            '400': {
+              description: 'Validation error',
+            },
+            '401': {
+              description: 'Authentication required',
+            },
+            '422': {
+              description: 'Request is not in AWAITING_PAYMENT status',
+            },
+          },
+        },
+      },
+      '/api/v1/admin/requests': {
+        get: {
+          tags: ['Admin Requests'],
+          summary: 'List and Search All Requests (Staff)',
+          description:
+            'Lists and searches engagement requests across all members with filters. Restricted to OPERATIONS_OFFICER, FINANCE_OFFICER, SYSTEM_ADMINISTRATOR.',
+          security: [{ cookieAuth: [] }, { bearerAuth: [] }],
+          parameters: [
+            {
+              name: 'status',
+              in: 'query',
+              schema: {
+                type: 'string',
+                enum: [
+                  'PENDING_PAYMENT',
+                  'SUBMITTED',
+                  'UNDER_REVIEW',
+                  'AWAITING_RESPONSE',
+                  'AWAITING_PAYMENT',
+                  'PAYMENT_CONFIRMED',
+                  'FULFILLED',
+                  'CANCELLED',
+                  'REJECTED',
+                ],
+              },
+            },
+            {
+              name: 'category',
+              in: 'query',
+              schema: {
+                type: 'string',
+                enum: [
+                  'CORE_SERVICE',
+                  'DIAGNOSTIC_TOOL',
+                  'BUSINESS_SIMULATION',
+                  'PROFESSIONAL_RECOGNITION',
+                ],
+              },
+            },
+            {
+              name: 'memberId',
+              in: 'query',
+              schema: { type: 'string', format: 'uuid' },
+            },
+            {
+              name: 'search',
+              in: 'query',
+              schema: { type: 'string' },
+            },
+            {
+              name: 'page',
+              in: 'query',
+              schema: { type: 'integer', default: 1 },
+            },
+            {
+              name: 'limit',
+              in: 'query',
+              schema: { type: 'integer', default: 20 },
+            },
+          ],
+          responses: {
+            '200': {
+              description: 'List of engagement requests',
+            },
+            '401': {
+              description: 'Authentication required',
+            },
+            '403': {
+              description: 'Forbidden: staff role required',
+            },
+          },
+        },
+      },
+      '/api/v1/admin/requests/{id}': {
+        get: {
+          tags: ['Admin Requests'],
+          summary: 'Get Detailed Request Context (Staff)',
+          description:
+            'Retrieves full request details, member context, audit history, and credentials. Restricted to OPERATIONS_OFFICER, FINANCE_OFFICER, SYSTEM_ADMINISTRATOR.',
+          security: [{ cookieAuth: [] }, { bearerAuth: [] }],
+          parameters: [
+            {
+              name: 'id',
+              in: 'path',
+              required: true,
+              schema: { type: 'string', example: 'REQ-2026-A8K2' },
+            },
+          ],
+          responses: {
+            '200': {
+              description: 'Detailed engagement request context',
+            },
+            '401': {
+              description: 'Authentication required',
+            },
+            '403': {
+              description: 'Forbidden: staff role required',
+            },
+            '404': {
+              description: 'Request not found',
+            },
+          },
+        },
+      },
+      '/api/v1/admin/requests/{id}/start-review': {
+        post: {
+          tags: ['Admin Requests'],
+          summary: 'Start Review on Request (Staff)',
+          description:
+            'Transitions request from SUBMITTED to UNDER_REVIEW with staff audit log. Restricted to OPERATIONS_OFFICER, SYSTEM_ADMINISTRATOR.',
+          security: [{ cookieAuth: [] }, { bearerAuth: [] }],
+          parameters: [
+            {
+              name: 'id',
+              in: 'path',
+              required: true,
+              schema: { type: 'string', example: 'REQ-2026-A8K2' },
+            },
+          ],
+          responses: {
+            '200': {
+              description: 'Request moved to UNDER_REVIEW',
+            },
+            '401': {
+              description: 'Authentication required',
+            },
+            '403': {
+              description: 'Forbidden',
+            },
+            '409': {
+              description: 'Optimistic locking conflict (request was updated concurrently)',
+            },
+            '422': {
+              description: 'Invalid state transition',
+            },
+          },
+        },
+      },
+      '/api/v1/admin/requests/{id}/request-info': {
+        post: {
+          tags: ['Admin Requests'],
+          summary: 'Request Info from Member (Staff)',
+          description:
+            'Transitions request to AWAITING_RESPONSE with mandatory review notes. Restricted to OPERATIONS_OFFICER, SYSTEM_ADMINISTRATOR.',
+          security: [{ cookieAuth: [] }, { bearerAuth: [] }],
+          parameters: [
+            {
+              name: 'id',
+              in: 'path',
+              required: true,
+              schema: { type: 'string', example: 'REQ-2026-A8K2' },
+            },
+          ],
+          requestBody: {
+            required: true,
+            content: {
+              'application/json': {
+                schema: { $ref: '#/components/schemas/AdminRequestInfoInput' },
+              },
+            },
+          },
+          responses: {
+            '200': {
+              description: 'Request moved to AWAITING_RESPONSE',
+            },
+            '400': {
+              description: 'Validation failed (reviewNotes min 5 characters)',
+            },
+            '401': {
+              description: 'Authentication required',
+            },
+            '403': {
+              description: 'Forbidden',
+            },
+            '422': {
+              description: 'Invalid state transition',
+            },
+          },
+        },
+      },
+      '/api/v1/admin/requests/{id}/reject': {
+        post: {
+          tags: ['Admin Requests'],
+          summary: 'Reject Request (Staff)',
+          description:
+            'Transitions request to REJECTED with mandatory rejection reason. Restricted to OPERATIONS_OFFICER, SYSTEM_ADMINISTRATOR.',
+          security: [{ cookieAuth: [] }, { bearerAuth: [] }],
+          parameters: [
+            {
+              name: 'id',
+              in: 'path',
+              required: true,
+              schema: { type: 'string', example: 'REQ-2026-A8K2' },
+            },
+          ],
+          requestBody: {
+            required: true,
+            content: {
+              'application/json': {
+                schema: { $ref: '#/components/schemas/AdminRejectRequestInput' },
+              },
+            },
+          },
+          responses: {
+            '200': {
+              description: 'Request rejected',
+            },
+            '400': {
+              description: 'Validation failed (rejectionReason min 5 characters)',
+            },
+            '401': {
+              description: 'Authentication required',
+            },
+            '403': {
+              description: 'Forbidden',
+            },
+            '422': {
+              description: 'Invalid state transition',
+            },
+          },
+        },
+      },
+      '/api/v1/admin/requests/{id}/approve': {
+        post: {
+          tags: ['Admin Requests'],
+          summary: 'Approve Request & Calculate Pricing (Staff)',
+          description:
+            'Approves request, recalculating price with tier discount. Transitions to AWAITING_PAYMENT or PAYMENT_CONFIRMED if $0. Restricted to OPERATIONS_OFFICER, SYSTEM_ADMINISTRATOR.',
+          security: [{ cookieAuth: [] }, { bearerAuth: [] }],
+          parameters: [
+            {
+              name: 'id',
+              in: 'path',
+              required: true,
+              schema: { type: 'string', example: 'REQ-2026-A8K2' },
+            },
+          ],
+          requestBody: {
+            required: false,
+            content: {
+              'application/json': {
+                schema: { $ref: '#/components/schemas/AdminApproveRequestInput' },
+              },
+            },
+          },
+          responses: {
+            '200': {
+              description: 'Request approved',
+            },
+            '401': {
+              description: 'Authentication required',
+            },
+            '403': {
+              description: 'Forbidden',
+            },
+            '422': {
+              description: 'Invalid state transition',
+            },
+          },
+        },
+      },
+      '/api/v1/admin/requests/{id}/fulfill': {
+        post: {
+          tags: ['Admin Requests'],
+          summary: 'Fulfill Request & Assign Credentials (Staff)',
+          description:
+            'Transitions request from PAYMENT_CONFIRMED to FULFILLED, automatically assigning credential pool items if diagnostic tool. Restricted to OPERATIONS_OFFICER, SYSTEM_ADMINISTRATOR.',
+          security: [{ cookieAuth: [] }, { bearerAuth: [] }],
+          parameters: [
+            {
+              name: 'id',
+              in: 'path',
+              required: true,
+              schema: { type: 'string', example: 'REQ-2026-A8K2' },
+            },
+          ],
+          requestBody: {
+            required: false,
+            content: {
+              'application/json': {
+                schema: { $ref: '#/components/schemas/AdminFulfillRequestInput' },
+              },
+            },
+          },
+          responses: {
+            '200': {
+              description: 'Request fulfilled',
+            },
+            '401': {
+              description: 'Authentication required',
+            },
+            '403': {
+              description: 'Forbidden',
+            },
+            '422': {
+              description: 'Request not in PAYMENT_CONFIRMED state',
+            },
+          },
+        },
+      },
+      '/api/v1/admin/requests/{id}/mark-paid': {
+        post: {
+          tags: ['Admin Requests'],
+          summary: 'Mark Request as Paid Offline (Finance Staff)',
+          description:
+            'Idempotent recording of offline/bank payment by FINANCE_OFFICER or SYSTEM_ADMINISTRATOR. Generates financial transaction and invoice.',
+          security: [{ cookieAuth: [] }, { bearerAuth: [] }],
+          parameters: [
+            {
+              name: 'id',
+              in: 'path',
+              required: true,
+              schema: { type: 'string', example: 'REQ-2026-A8K2' },
+            },
+          ],
+          requestBody: {
+            required: true,
+            content: {
+              'application/json': {
+                schema: { $ref: '#/components/schemas/AdminMarkPaidInput' },
+              },
+            },
+          },
+          responses: {
+            '200': {
+              description: 'Payment marked as confirmed and invoice generated',
+            },
+            '400': {
+              description: 'Validation failed: paymentRef is required',
+            },
+            '401': {
+              description: 'Authentication required',
+            },
+            '403': {
+              description: 'Forbidden: finance staff role required',
+            },
+            '422': {
+              description: 'Invalid state for marking paid',
+            },
+          },
+        },
+      },
+      '/api/v1/notifications': {
+        get: {
+          tags: ['Notifications'],
+          summary: 'Get In-App Notifications Feed',
+          description: 'Returns in-app notifications and unreadCount for the authenticated user.',
+          security: [{ cookieAuth: [] }, { bearerAuth: [] }],
+          responses: {
+            '200': {
+              description: 'Notifications list',
+              content: {
+                'application/json': {
+                  schema: {
+                    type: 'object',
+                    properties: {
+                      success: { type: 'boolean', example: true },
+                      data: {
+                        type: 'array',
+                        items: { $ref: '#/components/schemas/NotificationItem' },
+                      },
+                      unreadCount: { type: 'integer', example: 2 },
+                    },
+                  },
+                },
+              },
+            },
+            '401': {
+              description: 'Authentication required',
+            },
+          },
+        },
+      },
+      '/api/v1/notifications/read-all': {
+        patch: {
+          tags: ['Notifications'],
+          summary: 'Mark All Notifications as Read',
+          description: 'Marks all in-app notifications for the authenticated user as read.',
+          security: [{ cookieAuth: [] }, { bearerAuth: [] }],
+          responses: {
+            '200': {
+              description: 'All notifications marked as read',
+              content: {
+                'application/json': {
+                  schema: {
+                    type: 'object',
+                    properties: {
+                      success: { type: 'boolean', example: true },
+                      message: { type: 'string', example: 'All notifications marked as read.' },
+                    },
+                  },
+                },
+              },
+            },
+            '401': {
+              description: 'Authentication required',
+            },
+          },
+        },
+      },
+      '/api/v1/notifications/{id}/read': {
+        patch: {
+          tags: ['Notifications'],
+          summary: 'Mark Single Notification as Read',
+          description: 'Marks a specific notification as read by notification UUID.',
+          security: [{ cookieAuth: [] }, { bearerAuth: [] }],
+          parameters: [
+            {
+              name: 'id',
+              in: 'path',
+              required: true,
+              schema: { type: 'string', format: 'uuid' },
+            },
+          ],
+          responses: {
+            '200': {
+              description: 'Notification marked as read',
+              content: {
+                'application/json': {
+                  schema: {
+                    type: 'object',
+                    properties: {
+                      success: { type: 'boolean', example: true },
+                      message: { type: 'string', example: 'Notification marked as read.' },
+                    },
+                  },
+                },
+              },
+            },
+            '400': {
+              description: 'Invalid notification UUID',
+            },
+            '401': {
+              description: 'Authentication required',
+            },
+            '404': {
+              description: 'Notification not found',
+            },
+          },
+        },
+      },
+      '/api/v1/transactions': {
+        get: {
+          tags: ['Transactions & Invoices'],
+          summary: 'List Member Transactions',
+          description:
+            'Returns cursor-paginated financial transactions, invoice numbers, and payment status for the authenticated member.',
+          security: [{ cookieAuth: [] }, { bearerAuth: [] }],
+          parameters: [
+            {
+              name: 'cursor',
+              in: 'query',
+              schema: { type: 'string' },
+            },
+            {
+              name: 'limit',
+              in: 'query',
+              schema: { type: 'integer', default: 20 },
+            },
+            {
+              name: 'sourceType',
+              in: 'query',
+              schema: {
+                type: 'string',
+                enum: ['REQUEST', 'SHOP_ORDER', 'SUBSCRIPTION'],
+              },
+            },
+            {
+              name: 'status',
+              in: 'query',
+              schema: {
+                type: 'string',
+                enum: ['PENDING', 'CONFIRMED', 'FAILED', 'REFUNDED'],
+              },
+            },
+          ],
+          responses: {
+            '200': {
+              description: 'Transactions list',
+              content: {
+                'application/json': {
+                  schema: {
+                    type: 'object',
+                    properties: {
+                      success: { type: 'boolean', example: true },
+                      data: {
+                        type: 'array',
+                        items: { $ref: '#/components/schemas/TransactionItem' },
+                      },
+                      pagination: {
+                        type: 'object',
+                        properties: {
+                          nextCursor: { type: 'string', nullable: true },
+                          total: { type: 'integer' },
+                        },
+                      },
+                    },
+                  },
+                },
+              },
+            },
+            '401': {
+              description: 'Authentication required',
+            },
+            '403': {
+              description: 'Only members can access member transactions',
+            },
+          },
+        },
+      },
+      '/api/v1/transactions/{invoiceNumber}': {
+        get: {
+          tags: ['Transactions & Invoices'],
+          summary: 'Get Member Invoice Details',
+          description:
+            'Retrieves invoice metadata, billing breakdown, and receipt details for the authenticated member.',
+          security: [{ cookieAuth: [] }, { bearerAuth: [] }],
+          parameters: [
+            {
+              name: 'invoiceNumber',
+              in: 'path',
+              required: true,
+              schema: { type: 'string', example: 'INV-2026-00001' },
+            },
+          ],
+          responses: {
+            '200': {
+              description: 'Invoice details',
+            },
+            '400': {
+              description: 'Invalid invoice number format',
+            },
+            '401': {
+              description: 'Authentication required',
+            },
+            '403': {
+              description: 'Forbidden',
+            },
+            '404': {
+              description: 'Invoice not found',
+            },
+          },
+        },
+      },
+      '/api/v1/admin/transactions': {
+        get: {
+          tags: ['Admin Transactions'],
+          summary: 'List Ledger Transactions (Staff)',
+          description:
+            'Staff ledger query across all transactions with filtering. Restricted to FINANCE_OFFICER, SYSTEM_ADMINISTRATOR.',
+          security: [{ cookieAuth: [] }, { bearerAuth: [] }],
+          parameters: [
+            {
+              name: 'cursor',
+              in: 'query',
+              schema: { type: 'string' },
+            },
+            {
+              name: 'limit',
+              in: 'query',
+              schema: { type: 'integer', default: 20 },
+            },
+            {
+              name: 'userId',
+              in: 'query',
+              schema: { type: 'string', format: 'uuid' },
+            },
+            {
+              name: 'sourceType',
+              in: 'query',
+              schema: {
+                type: 'string',
+                enum: ['REQUEST', 'SHOP_ORDER', 'SUBSCRIPTION'],
+              },
+            },
+            {
+              name: 'status',
+              in: 'query',
+              schema: {
+                type: 'string',
+                enum: ['PENDING', 'CONFIRMED', 'FAILED', 'REFUNDED'],
+              },
+            },
+          ],
+          responses: {
+            '200': {
+              description: 'Ledger transactions',
+            },
+            '401': {
+              description: 'Authentication required',
+            },
+            '403': {
+              description: 'Forbidden: finance staff role required',
+            },
+          },
+        },
+      },
+      '/api/v1/admin/transactions/{invoiceNumber}': {
+        get: {
+          tags: ['Admin Transactions'],
+          summary: 'Get Invoice Lookup (Staff)',
+          description:
+            'Retrieves invoice and member financial record by invoice number. Restricted to FINANCE_OFFICER, SYSTEM_ADMINISTRATOR.',
+          security: [{ cookieAuth: [] }, { bearerAuth: [] }],
+          parameters: [
+            {
+              name: 'invoiceNumber',
+              in: 'path',
+              required: true,
+              schema: { type: 'string', example: 'INV-2026-00001' },
+            },
+          ],
+          responses: {
+            '200': {
+              description: 'Invoice details',
+            },
+            '400': {
+              description: 'Invalid invoice number format',
+            },
+            '401': {
+              description: 'Authentication required',
+            },
+            '403': {
+              description: 'Forbidden: finance staff role required',
+            },
+            '404': {
+              description: 'Invoice not found',
             },
           },
         },

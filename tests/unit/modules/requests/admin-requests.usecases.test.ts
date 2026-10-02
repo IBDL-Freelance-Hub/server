@@ -103,16 +103,29 @@ describe('Admin Endpoints & Transition Side-Effects (Step 4)', () => {
         isRead: false,
       }),
       getInAppNotificationsForUser: jest.fn().mockResolvedValue([]),
+      dispatchEmailOnly: jest.fn().mockResolvedValue(undefined),
+      saveInAppNotification: jest.fn().mockResolvedValue('notif-1'),
     };
 
     mockPrisma = {
       engagementRequest: {
         findFirst: jest.fn(),
         update: jest.fn(),
+        updateMany: jest.fn().mockResolvedValue({ count: 1 }),
       },
       assessmentCredentialPool: {
         findFirst: jest.fn(),
         update: jest.fn(),
+        updateMany: jest.fn().mockResolvedValue({ count: 1 }),
+      },
+      transaction: {
+        findUnique: jest.fn(),
+        create: jest.fn().mockResolvedValue({
+          id: 'tx-1',
+          invoiceNumber: 'INV-2026-00001',
+          status: 'CONFIRMED',
+          paidAt: new Date(),
+        }),
       },
       auditLog: {
         create: jest.fn().mockResolvedValue({ id: 'audit-1' }),
@@ -134,8 +147,8 @@ describe('Admin Endpoints & Transition Side-Effects (Step 4)', () => {
       const result = await useCase.execute('REQ-2026-0001', mockActor);
 
       expect(result.status).toBe(EngagementRequestStatus.UNDER_REVIEW);
-      expect(mockPrisma.engagementRequest.update).toHaveBeenCalledWith({
-        where: { id: baseReq.id },
+      expect(mockPrisma.engagementRequest.updateMany).toHaveBeenCalledWith({
+        where: { id: baseReq.id, status: baseReq.status },
         data: { status: EngagementRequestStatus.UNDER_REVIEW },
       });
 
@@ -161,7 +174,8 @@ describe('Admin Endpoints & Transition Side-Effects (Step 4)', () => {
       );
 
       // Notification dispatched
-      expect(mockNotificationSvc.dispatchNotification).toHaveBeenCalledWith(
+      expect(mockNotificationSvc.saveInAppNotification).toHaveBeenCalledWith(
+        expect.anything(),
         expect.objectContaining({
           userId: 'user-member-1',
           type: 'REQUEST_UNDER_REVIEW',
@@ -215,7 +229,8 @@ describe('Admin Endpoints & Transition Side-Effects (Step 4)', () => {
           }),
         }),
       );
-      expect(mockNotificationSvc.dispatchNotification).toHaveBeenCalledWith(
+      expect(mockNotificationSvc.saveInAppNotification).toHaveBeenCalledWith(
+        expect.anything(),
         expect.objectContaining({
           type: 'REQUEST_INFO_REQUESTED',
         }),
@@ -259,7 +274,8 @@ describe('Admin Endpoints & Transition Side-Effects (Step 4)', () => {
           }),
         }),
       );
-      expect(mockNotificationSvc.dispatchNotification).toHaveBeenCalledWith(
+      expect(mockNotificationSvc.saveInAppNotification).toHaveBeenCalledWith(
+        expect.anything(),
         expect.objectContaining({
           type: 'REQUEST_REJECTED',
         }),
@@ -304,7 +320,8 @@ describe('Admin Endpoints & Transition Side-Effects (Step 4)', () => {
 
       expect(result.status).toBe(EngagementRequestStatus.AWAITING_PAYMENT);
       expect(result.pricing.finalPrice).toBe(8500); // 10000 - 15% (Essential tier)
-      expect(mockNotificationSvc.dispatchNotification).toHaveBeenCalledWith(
+      expect(mockNotificationSvc.saveInAppNotification).toHaveBeenCalledWith(
+        expect.anything(),
         expect.objectContaining({
           type: 'REQUEST_APPROVED',
           titleEn: expect.stringContaining('Awaiting Payment'),
@@ -340,7 +357,8 @@ describe('Admin Endpoints & Transition Side-Effects (Step 4)', () => {
 
       expect(result.status).toBe(EngagementRequestStatus.PAYMENT_CONFIRMED);
       expect(result.pricing.finalPrice).toBe(0);
-      expect(mockNotificationSvc.dispatchNotification).toHaveBeenCalledWith(
+      expect(mockNotificationSvc.saveInAppNotification).toHaveBeenCalledWith(
+        expect.anything(),
         expect.objectContaining({
           type: 'REQUEST_APPROVED',
           titleEn: expect.stringContaining('Fully Covered'),
@@ -432,7 +450,8 @@ describe('Admin Endpoints & Transition Side-Effects (Step 4)', () => {
           }),
         }),
       );
-      expect(mockNotificationSvc.dispatchNotification).toHaveBeenCalledWith(
+      expect(mockNotificationSvc.saveInAppNotification).toHaveBeenCalledWith(
+        expect.anything(),
         expect.objectContaining({
           type: 'REQUEST_FULFILLED',
           messageEn: expect.stringContaining('candidate_user_1'),
@@ -487,7 +506,8 @@ describe('Admin Endpoints & Transition Side-Effects (Step 4)', () => {
         }),
       );
 
-      expect(mockNotificationSvc.dispatchNotification).toHaveBeenCalledWith(
+      expect(mockNotificationSvc.saveInAppNotification).toHaveBeenCalledWith(
+        expect.anything(),
         expect.objectContaining({
           userId: 'user-member-1',
           referenceCode: 'REQ-2026-0001',

@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import { requireAuth, validateRequest } from '../../../shared/middleware';
+import { requireAuth, validateRequest, requestsRateLimiter } from '../../../shared/middleware';
 import { MemberRequestsController } from './member-requests.controller';
 import {
   listMemberRequestsQuerySchema,
@@ -30,6 +30,7 @@ router.get(
 // POST /api/v1/requests/:id/cancel — Cancel Request
 router.post(
   '/:id/cancel',
+  requestsRateLimiter,
   requireAuth,
   validateRequest({
     params: requestIdOrRefParamSchema,
@@ -41,6 +42,7 @@ router.post(
 // POST /api/v1/requests/:id/respond-info — Respond to info request
 router.post(
   '/:id/respond-info',
+  requestsRateLimiter,
   requireAuth,
   validateRequest({
     params: requestIdOrRefParamSchema,

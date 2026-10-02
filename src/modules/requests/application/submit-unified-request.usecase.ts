@@ -18,7 +18,7 @@ import {
   getContractualQuarter,
   isEligibleForMasterQuarterlyEntitlement,
 } from '../domain/quarterly-entitlement';
-import { generateRequestReference } from '../domain/reference-generator';
+import { generateAtomicSequentialReference } from '../domain/reference-generator';
 
 export interface SubmitUnifiedRequestInput {
   itemSlug: string;
@@ -90,36 +90,6 @@ export class SubmitUnifiedRequestUseCase {
       );
     }
 
-    // 3. REQ-14: Active duplicate request prevention
-    // Prevent submitting duplicate requests if one is currently active (SUBMITTED, UNDER_REVIEW, AWAITING_RESPONSE, AWAITING_PAYMENT)
-    const existingActiveRequest = await this.prisma.engagementRequest.findFirst({
-      where: {
-        memberId: member.id,
-        catalogItemId: item.id,
-        status: {
-          in: [
-            EngagementRequestStatus.SUBMITTED,
-            EngagementRequestStatus.UNDER_REVIEW,
-            EngagementRequestStatus.AWAITING_RESPONSE,
-            EngagementRequestStatus.AWAITING_PAYMENT,
-          ],
-        },
-      },
-      select: { referenceCode: true, status: true },
-    });
-
-    if (existingActiveRequest) {
-      throw new ConflictError(
-        `REQ-14: An active request (${existingActiveRequest.referenceCode}) for item '${item.nameEn}' is already in progress with status '${existingActiveRequest.status}'.`,
-        {
-          referenceCode: existingActiveRequest.referenceCode,
-          status: existingActiveRequest.status,
-          catalogItemId: item.id,
-          slug: item.slug,
-        },
-      );
-    }
-
     // 4. Validate brief schema requirements based on pricingModel
     if (item.pricingModel === PricingModel.PERCENTAGE) {
       const projectValue = Number(input.brief?.['project_value']);
@@ -136,153 +106,198 @@ export class SubmitUnifiedRequestUseCase {
     const tier = currentMembership?.tier ?? MembershipTier.ESSENTIAL;
     const membershipStatus = currentMembership?.status ?? MembershipStatus.ACTIVE;
 
-    // 6. Pricing & Entitlement Evaluation
-    let isQuarterlyEligible = false;
-    let quarterInfo: ReturnType<typeof getContractualQuarter> | undefined;
-    let isFirstAssessmentUse = false;
+    // 6. Pricing & Entitlement Evaluation (Inside Transaction for Concurrency Safety)
+    // timeout raised to 30 s so concurrent requests don't expire on a remote DB
+    const createdRequestResult = await this.prisma.$transaction(
+      async (tx) => {
+        // Lock member record to serialize concurrent requests for the same member
+        if (typeof tx.$queryRaw === 'function') {
+          await tx.$queryRaw`SELECT 1 FROM "Member" WHERE id = ${member.id} FOR UPDATE`;
+        }
 
-    if (item.category === CatalogItemCategory.DIAGNOSTIC_TOOL) {
-      // Free-then-paid: evaluate first assessment use per assessment instrument
-      if (membershipStatus === MembershipStatus.ACTIVE) {
-        const previousUsages = await this.prisma.engagementRequest.count({
+        // 3. REQ-14: Active duplicate request prevention (Inside Transaction for thread-safety)
+        const existingActiveRequest = await tx.engagementRequest.findFirst({
           where: {
             memberId: member.id,
             catalogItemId: item.id,
             status: {
-              notIn: [EngagementRequestStatus.CANCELLED, EngagementRequestStatus.REJECTED],
+              in: [
+                EngagementRequestStatus.SUBMITTED,
+                EngagementRequestStatus.UNDER_REVIEW,
+                EngagementRequestStatus.AWAITING_RESPONSE,
+                EngagementRequestStatus.AWAITING_PAYMENT,
+                EngagementRequestStatus.PAYMENT_CONFIRMED,
+              ],
+            },
+          },
+          select: { referenceCode: true, status: true },
+        });
+
+        if (existingActiveRequest) {
+          throw new ConflictError(
+            `REQ-14: An active request (${existingActiveRequest.referenceCode}) for item '${item.nameEn}' is already in progress with status '${existingActiveRequest.status}'.`,
+            {
+              referenceCode: existingActiveRequest.referenceCode,
+              status: existingActiveRequest.status,
+              catalogItemId: item.id,
+              slug: item.slug,
+            },
+          );
+        }
+
+        let isQuarterlyEligible = false;
+        let quarterInfo: ReturnType<typeof getContractualQuarter> | undefined;
+        let isFirstAssessmentUse = false;
+
+        if (item.category === CatalogItemCategory.DIAGNOSTIC_TOOL) {
+          // Free-then-paid: evaluate first assessment use per assessment instrument
+          if (membershipStatus === MembershipStatus.ACTIVE) {
+            const previousUsages = await tx.engagementRequest.count({
+              where: {
+                memberId: member.id,
+                catalogItemId: item.id,
+                status: {
+                  notIn: [EngagementRequestStatus.CANCELLED, EngagementRequestStatus.REJECTED],
+                },
+              },
+            });
+            isFirstAssessmentUse = previousUsages === 0;
+          }
+        }
+
+        // Master Quarterly Entitlement (BRU-47, MEM-14, MEM-16, MEM-76, SHP-84)
+        const isEntitlementItem = isEligibleForMasterQuarterlyEntitlement({
+          category: item.category,
+          pricingModel: item.pricingModel,
+          isActive: item.isActive,
+        });
+
+        if (
+          tier === MembershipTier.MASTER &&
+          membershipStatus === MembershipStatus.ACTIVE &&
+          isEntitlementItem
+        ) {
+          quarterInfo = getContractualQuarter(currentMembership!.startDate, new Date());
+
+          const activeQuarterUsages = await tx.engagementRequest.count({
+            where: {
+              memberId: member.id,
+              isQuarterlyEntitlement: true,
+              quarterIndex: quarterInfo.quarterIndex,
+              membershipYear: quarterInfo.membershipYear,
+              status: {
+                notIn: [EngagementRequestStatus.CANCELLED, EngagementRequestStatus.REJECTED],
+              },
+            },
+          });
+
+          isQuarterlyEligible = activeQuarterUsages === 0;
+        }
+
+        // Event license pricing for simulation games: unit * trainees (SHP-84)
+        let basePrice = Number(item.basePrice);
+        if (
+          item.category === CatalogItemCategory.BUSINESS_SIMULATION &&
+          item.pricingModel === PricingModel.FIXED
+        ) {
+          const trainees = Number(
+            input.brief?.['trainees'] ??
+              input.brief?.['traineeCount'] ??
+              input.brief?.['participants'] ??
+              input.brief?.['participantCount'] ??
+              1,
+          );
+          if (!isNaN(trainees) && trainees > 0) {
+            const roundedTrainees = Math.round(trainees);
+            if (basePrice * roundedTrainees > 2147483647) {
+              throw new ValidationError(
+                'Trainee count results in a total price that exceeds the maximum allowed limit.',
+              );
+            }
+            basePrice = basePrice * roundedTrainees;
+          }
+        }
+
+        const pricing = calculateItemPricing({
+          basePrice,
+          category: item.category,
+          pricingModel: item.pricingModel,
+          tier,
+          membershipStatus,
+          isQuarterlyEntitlementEligible: isQuarterlyEligible,
+          isFirstAssessmentUse,
+        });
+
+        // 7. Determine initial workflow status
+        let initialStatus: EngagementRequestStatus;
+        if (item.category === CatalogItemCategory.DIAGNOSTIC_TOOL) {
+          initialStatus =
+            pricing.finalPrice === 0
+              ? EngagementRequestStatus.PAYMENT_CONFIRMED
+              : EngagementRequestStatus.AWAITING_PAYMENT;
+        } else {
+          initialStatus =
+            pricing.finalPrice === 0
+              ? EngagementRequestStatus.UNDER_REVIEW
+              : EngagementRequestStatus.AWAITING_PAYMENT;
+        }
+
+        // 8. Atomically persist engagement request and audit log
+        const referenceCode = await generateAtomicSequentialReference(tx);
+        const reqRecord = await tx.engagementRequest.create({
+          data: {
+            referenceCode,
+            memberId: member.id,
+            catalogItemId: item.id,
+            category: item.category,
+            status: initialStatus,
+            pricingModel: item.pricingModel,
+            tierAtRequest: tier,
+            membershipStatusAtRequest: membershipStatus,
+            basePrice: pricing.basePrice,
+            discountPercentage: pricing.discountPercentage,
+            finalPrice: pricing.finalPrice,
+            currency: pricing.currency,
+            isQuarterlyEntitlement: pricing.isQuarterlyEntitlementApplied,
+            quarterIndex: pricing.isQuarterlyEntitlementApplied ? quarterInfo?.quarterIndex : null,
+            membershipYear: pricing.isQuarterlyEntitlementApplied
+              ? quarterInfo?.membershipYear
+              : null,
+            brief: input.brief ? JSON.parse(JSON.stringify(input.brief)) : undefined,
+            customRequirements: input.customRequirements?.trim() || null,
+            acknowledgement: input.acknowledgement ?? true,
+            intakeData: input.brief ? JSON.parse(JSON.stringify(input.brief)) : undefined,
+          },
+        });
+
+        await tx.auditLog.create({
+          data: {
+            actorId: userId,
+            actorRole: 'MEMBER',
+            action: 'SUBMIT_REQUEST',
+            resource: 'ENGAGEMENT_REQUEST',
+            resourceId: reqRecord.id,
+            ipAddress: meta.ipAddress,
+            requestId: meta.requestId,
+            newState: {
+              referenceCode: reqRecord.referenceCode,
+              itemSlug: item.slug,
+              category: item.category,
+              status: reqRecord.status,
+              finalPrice: pricing.finalPrice,
+              isQuarterlyEntitlementApplied: pricing.isQuarterlyEntitlementApplied,
+              isFirstUseFreeApplied: pricing.isFirstUseFreeApplied,
+              quarterIndex: reqRecord.quarterIndex,
             },
           },
         });
-        isFirstAssessmentUse = previousUsages === 0;
-      }
-    }
 
-    // Master Quarterly Entitlement (BRU-47, MEM-14, MEM-16, MEM-76, SHP-84)
-    // Applies to both DIAGNOSTIC_TOOL and BUSINESS_SIMULATION when priced & active
-    const isEntitlementItem = isEligibleForMasterQuarterlyEntitlement({
-      category: item.category,
-      pricingModel: item.pricingModel,
-      isActive: item.isActive,
-    });
+        return { reqRecord, pricing };
+      },
+      { timeout: 30000 },
+    );
 
-    if (
-      tier === MembershipTier.MASTER &&
-      membershipStatus === MembershipStatus.ACTIVE &&
-      isEntitlementItem
-    ) {
-      quarterInfo = getContractualQuarter(currentMembership!.startDate, new Date());
-
-      const activeQuarterUsages = await this.prisma.engagementRequest.count({
-        where: {
-          memberId: member.id,
-          isQuarterlyEntitlement: true,
-          quarterIndex: quarterInfo.quarterIndex,
-          membershipYear: quarterInfo.membershipYear,
-          status: {
-            notIn: [EngagementRequestStatus.CANCELLED, EngagementRequestStatus.REJECTED],
-          },
-        },
-      });
-
-      isQuarterlyEligible = activeQuarterUsages === 0;
-    }
-
-    // Event license pricing for simulation games: unit * trainees (SHP-84)
-    let basePrice = Number(item.basePrice);
-    if (
-      item.category === CatalogItemCategory.BUSINESS_SIMULATION &&
-      item.pricingModel === PricingModel.FIXED
-    ) {
-      const trainees = Number(
-        input.brief?.['trainees'] ??
-          input.brief?.['traineeCount'] ??
-          input.brief?.['participants'] ??
-          input.brief?.['participantCount'] ??
-          1,
-      );
-      if (!isNaN(trainees) && trainees > 0) {
-        basePrice = basePrice * Math.round(trainees);
-      }
-    }
-
-    const pricing = calculateItemPricing({
-      basePrice,
-      category: item.category,
-      pricingModel: item.pricingModel,
-      tier,
-      membershipStatus,
-      isQuarterlyEntitlementEligible: isQuarterlyEligible,
-      isFirstAssessmentUse,
-    });
-
-    // 7. Determine initial workflow status
-    let initialStatus: EngagementRequestStatus;
-    if (item.category === CatalogItemCategory.DIAGNOSTIC_TOOL) {
-      initialStatus =
-        pricing.finalPrice === 0
-          ? EngagementRequestStatus.PAYMENT_CONFIRMED
-          : EngagementRequestStatus.AWAITING_PAYMENT;
-    } else {
-      initialStatus =
-        pricing.finalPrice === 0
-          ? EngagementRequestStatus.UNDER_REVIEW
-          : EngagementRequestStatus.AWAITING_PAYMENT;
-    }
-
-    const referenceCode = generateRequestReference();
-
-    // 8. Atomically persist engagement request and audit log
-    const createdRequest = await this.prisma.$transaction(async (tx) => {
-      const reqRecord = await tx.engagementRequest.create({
-        data: {
-          referenceCode,
-          memberId: member.id,
-          catalogItemId: item.id,
-          category: item.category,
-          status: initialStatus,
-          pricingModel: item.pricingModel,
-          tierAtRequest: tier,
-          membershipStatusAtRequest: membershipStatus,
-          basePrice: pricing.basePrice,
-          discountPercentage: pricing.discountPercentage,
-          finalPrice: pricing.finalPrice,
-          currency: pricing.currency,
-          isQuarterlyEntitlement: pricing.isQuarterlyEntitlementApplied,
-          quarterIndex: pricing.isQuarterlyEntitlementApplied ? quarterInfo?.quarterIndex : null,
-          membershipYear: pricing.isQuarterlyEntitlementApplied
-            ? quarterInfo?.membershipYear
-            : null,
-          brief: input.brief ? JSON.parse(JSON.stringify(input.brief)) : undefined,
-          customRequirements: input.customRequirements?.trim() || null,
-          acknowledgement: input.acknowledgement ?? true,
-          intakeData: input.brief ? JSON.parse(JSON.stringify(input.brief)) : undefined,
-        },
-      });
-
-      await tx.auditLog.create({
-        data: {
-          actorId: userId,
-          actorRole: 'MEMBER',
-          action: 'SUBMIT_REQUEST',
-          resource: 'ENGAGEMENT_REQUEST',
-          resourceId: reqRecord.id,
-          ipAddress: meta.ipAddress,
-          requestId: meta.requestId,
-          newState: {
-            referenceCode: reqRecord.referenceCode,
-            itemSlug: item.slug,
-            category: item.category,
-            status: reqRecord.status,
-            finalPrice: pricing.finalPrice,
-            isQuarterlyEntitlementApplied: pricing.isQuarterlyEntitlementApplied,
-            isFirstUseFreeApplied: pricing.isFirstUseFreeApplied,
-            quarterIndex: reqRecord.quarterIndex,
-          },
-        },
-      });
-
-      return reqRecord;
-    });
+    const { reqRecord: createdRequest, pricing } = createdRequestResult;
 
     let message: string;
     if (pricing.isFirstUseFreeApplied) {

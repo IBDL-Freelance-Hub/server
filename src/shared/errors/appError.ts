@@ -11,6 +11,8 @@ export abstract class AppError extends Error {
 
     // Restore prototype chain for instanceof checks
     Object.setPrototypeOf(this, new.target.prototype);
+    // Ensure error.name reflects the subclass name, not the generic "Error"
+    this.name = this.constructor.name;
     Error.captureStackTrace(this, this.constructor);
   }
 }

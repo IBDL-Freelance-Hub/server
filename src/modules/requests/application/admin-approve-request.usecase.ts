@@ -1,6 +1,6 @@
 import { PrismaClient, EngagementRequestStatus, PricingModel } from '@prisma/client';
 import { prisma as defaultPrisma } from '../../../shared/providers';
-import { NotFoundError } from '../../../shared/errors';
+import { NotFoundError, ConflictError, ValidationError } from '../../../shared/errors';
 import { assertValidRequestTransition } from '../domain/request-state-machine';
 import { calculateApprovedPrice, PricingCalculationResult } from '../domain/pricing-calculator';
 import {
@@ -58,6 +58,11 @@ export class AdminApproveRequestUseCase {
       const briefVal = (request.brief as Record<string, unknown> | null)?.['project_value'];
       if (briefVal !== undefined && briefVal !== null) {
         effectiveBaseAmount = Number(briefVal);
+        if (effectiveBaseAmount > 2147483647) {
+          throw new ValidationError(
+            'project_value in the request brief exceeds the maximum allowed limit.',
+          );
+        }
       }
     }
 
@@ -93,90 +98,114 @@ export class AdminApproveRequestUseCase {
         : input.adminNotes.trim()
       : request.adminNotes;
 
-    const updated = await this.prisma.$transaction(async (tx) => {
-      const rec = await tx.engagementRequest.update({
-        where: { id: request.id },
-        data: {
-          status: targetStatus,
-          baseAmount: effectiveBaseAmount ?? pricing.basePrice,
-          basePrice: pricing.basePrice,
-          discountPercentage: pricing.discountPercentage,
-          discountAmount: pricing.discountAmount,
-          finalPrice: pricing.finalPrice,
-          currency: pricing.currency,
-          adminNotes: adminNotesCombined,
-          approvedAt: now,
-          paidAt: targetStatus === EngagementRequestStatus.PAYMENT_CONFIRMED ? now : request.paidAt,
-        },
-      });
-
-      // 1. Immutable Staff AuditLog (SEC-33)
-      await tx.auditLog.create({
-        data: {
-          actorId: actor.userId,
-          actorRole: actor.staffRole,
-          action: 'ADMIN_REQUEST_APPROVED',
-          resource: 'EngagementRequest',
-          resourceId: request.id,
-          reason: input.adminNotes?.trim() || null,
-          ipAddress: actor.ipAddress,
-          requestId: actor.requestId,
-          previousState: { status: request.status, finalPrice: request.finalPrice },
-          newState: {
+    const updated = await this.prisma.$transaction(
+      async (tx) => {
+        const updateResult = await tx.engagementRequest.updateMany({
+          where: { id: request.id, status: request.status },
+          data: {
             status: targetStatus,
+            baseAmount: effectiveBaseAmount ?? pricing.basePrice,
             basePrice: pricing.basePrice,
             discountPercentage: pricing.discountPercentage,
             discountAmount: pricing.discountAmount,
             finalPrice: pricing.finalPrice,
+            currency: pricing.currency,
+            adminNotes: adminNotesCombined,
             approvedAt: now,
+            paidAt:
+              targetStatus === EngagementRequestStatus.PAYMENT_CONFIRMED ? now : request.paidAt,
           },
-        },
-      });
+        });
 
-      // 2. Member Activity Feed Timeline Entry (ACT-58)
-      await tx.auditLog.create({
-        data: {
-          actorId: request.member.userId,
-          actorRole: 'MEMBER',
-          action: 'REQUEST_APPROVED',
-          resource: 'EngagementRequest',
-          resourceId: request.id,
-          reason: input.adminNotes?.trim() || null,
-          previousState: { status: request.status },
-          newState: { status: targetStatus, finalPrice: pricing.finalPrice },
-        },
-      });
+        if (updateResult.count === 0) {
+          throw new ConflictError(
+            `Request status was updated concurrently. Expected '${request.status}' but it has changed. Please refresh and try again.`,
+          );
+        }
 
-      return rec;
-    });
+        // 1. Immutable Staff AuditLog (SEC-33)
+        await tx.auditLog.create({
+          data: {
+            actorId: actor.userId,
+            actorRole: actor.staffRole,
+            action: 'ADMIN_REQUEST_APPROVED',
+            resource: 'EngagementRequest',
+            resourceId: request.id,
+            reason: input.adminNotes?.trim() || null,
+            ipAddress: actor.ipAddress,
+            requestId: actor.requestId,
+            previousState: { status: request.status, finalPrice: request.finalPrice },
+            newState: {
+              status: targetStatus,
+              basePrice: pricing.basePrice,
+              discountPercentage: pricing.discountPercentage,
+              discountAmount: pricing.discountAmount,
+              finalPrice: pricing.finalPrice,
+              approvedAt: now,
+            },
+          },
+        });
 
-    // 3. Dispatch Member Notification
-    const formattedPrice = (pricing.finalPrice / 100).toFixed(2);
-    if (targetStatus === EngagementRequestStatus.PAYMENT_CONFIRMED) {
-      await this.notificationSvc.dispatchNotification({
-        userId: request.member.userId,
-        memberEmail: request.member.user.email,
-        referenceCode: request.referenceCode,
-        type: 'REQUEST_APPROVED',
-        titleEn: 'Request Approved (Fully Covered)',
-        titleAr: 'تمت الموافقة على الطلب (مغطى بالكامل)',
-        messageEn: `Your request (${request.referenceCode}) has been approved with 100% coverage ($0 payable). It is now awaiting fulfillment.`,
-        messageAr: `تمت الموافقة على طلبك (${request.referenceCode}) بنسبة تغطية 100% (المبلغ المستحق: 0$). الطلب بانتظار التنفيذ.`,
-        metadata: { requestId: request.id, finalPrice: 0, status: targetStatus },
-      });
-    } else {
-      await this.notificationSvc.dispatchNotification({
-        userId: request.member.userId,
-        memberEmail: request.member.user.email,
-        referenceCode: request.referenceCode,
-        type: 'REQUEST_APPROVED',
-        titleEn: 'Request Approved - Awaiting Payment',
-        titleAr: 'تمت الموافقة على الطلب - بانتظار الدفع',
-        messageEn: `Your request (${request.referenceCode}) has been approved. The payable amount is $${formattedPrice} ${pricing.currency}. Please proceed to payment.`,
-        messageAr: `تمت الموافقة على طلبك (${request.referenceCode}). المبلغ المستحق للدفع هو $${formattedPrice} ${pricing.currency}. يرجى استكمال عملية الدفع.`,
-        metadata: { requestId: request.id, finalPrice: pricing.finalPrice, status: targetStatus },
-      });
-    }
+        // 2. Member Activity Feed Timeline Entry (ACT-58)
+        await tx.auditLog.create({
+          data: {
+            actorId: request.member.userId,
+            actorRole: 'MEMBER',
+            action: 'REQUEST_APPROVED',
+            resource: 'EngagementRequest',
+            resourceId: request.id,
+            reason: input.adminNotes?.trim() || null,
+            previousState: { status: request.status },
+            newState: { status: targetStatus, finalPrice: pricing.finalPrice },
+          },
+        });
+
+        // 3. Persist Notification in DB
+        let notifInput: Parameters<typeof this.notificationSvc.saveInAppNotification>[1];
+        const formattedPrice = (pricing.finalPrice / 100).toFixed(2);
+        if (targetStatus === EngagementRequestStatus.PAYMENT_CONFIRMED) {
+          notifInput = {
+            userId: request.member.userId,
+            memberEmail: request.member.user.email,
+            referenceCode: request.referenceCode,
+            type: 'REQUEST_APPROVED',
+            titleEn: 'Request Approved (Fully Covered)',
+            titleAr: 'تمت الموافقة على الطلب (مغطى بالكامل)',
+            messageEn: `Your request (${request.referenceCode}) has been approved with 100% coverage ($0 payable). It is now awaiting fulfillment.`,
+            messageAr: `تمت الموافقة على طلبك (${request.referenceCode}) بنسبة تغطية 100% (المبلغ المستحق: 0$). الطلب بانتظار التنفيذ.`,
+            metadata: { requestId: request.id, finalPrice: 0, status: targetStatus },
+          };
+        } else {
+          notifInput = {
+            userId: request.member.userId,
+            memberEmail: request.member.user.email,
+            referenceCode: request.referenceCode,
+            type: 'REQUEST_APPROVED',
+            titleEn: 'Request Approved - Awaiting Payment',
+            titleAr: 'تمت الموافقة على الطلب - بانتظار الدفع',
+            messageEn: `Your request (${request.referenceCode}) has been approved. The payable amount is $${formattedPrice} ${pricing.currency}. Please proceed to payment.`,
+            messageAr: `تمت الموافقة على طلبك (${request.referenceCode}). المبلغ المستحق للدفع هو $${formattedPrice} ${pricing.currency}. يرجى استكمال عملية الدفع.`,
+            metadata: {
+              requestId: request.id,
+              finalPrice: pricing.finalPrice,
+              status: targetStatus,
+            },
+          };
+        }
+        await this.notificationSvc.saveInAppNotification(tx, notifInput);
+
+        return {
+          id: request.id,
+          referenceCode: request.referenceCode,
+          status: targetStatus,
+          notifInput,
+        };
+      },
+      { timeout: 30000 },
+    );
+
+    // 4. Dispatch Member Email (Fire & Forget outside transaction)
+    this.notificationSvc.dispatchEmailOnly(updated.notifInput).catch(() => {});
 
     return {
       id: updated.id,

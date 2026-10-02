@@ -362,6 +362,7 @@ describe('AdminRequestsController Unit Tests', () => {
 
   describe('markPaid', () => {
     it('should return 200 with payment confirmation', async () => {
+      mockReq.user!.staffRole = StaffRole.FINANCE_OFFICER;
       mockReq.body = { paymentRef: 'TXN-9988' };
       mockMarkPaidUseCase.execute.mockResolvedValue({
         id: 'req-1',

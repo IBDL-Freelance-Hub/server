@@ -438,7 +438,7 @@ export const INITIAL_CATALOG_ITEMS = [
   {
     slug: 'pqp-level-2',
     category: CatalogItemCategory.DIAGNOSTIC_TOOL,
-    pricingModel: PricingModel.FREE_THEN_PAID,
+    pricingModel: PricingModel.FIXED,
     packageLevel: 'LEVEL_2',
     nameEn: 'PQP™ - Personality & Qualities Portfolio - Level 2',
     nameAr: 'PQP™ - محفظة الشخصية والصفات القيادية - المستوى الثاني',
@@ -457,7 +457,7 @@ export const INITIAL_CATALOG_ITEMS = [
   {
     slug: 'pqp-level-3',
     category: CatalogItemCategory.DIAGNOSTIC_TOOL,
-    pricingModel: PricingModel.FREE_THEN_PAID,
+    pricingModel: PricingModel.FIXED,
     packageLevel: 'LEVEL_3',
     nameEn: 'PQP™ - Personality & Qualities Portfolio - Level 3',
     nameAr: 'PQP™ - محفظة الشخصية والصفات القيادية - المستوى الثالث',
@@ -499,7 +499,7 @@ export const INITIAL_CATALOG_ITEMS = [
   {
     slug: 'cpat-level-2',
     category: CatalogItemCategory.DIAGNOSTIC_TOOL,
-    pricingModel: PricingModel.FREE_THEN_PAID,
+    pricingModel: PricingModel.FIXED,
     packageLevel: 'LEVEL_2',
     nameEn: 'CPAT™ - Change Profile & Adaptability Tool - Level 2',
     nameAr: 'CPAT™ - أداة تشخيص التكيّف والتغيير - المستوى الثاني',
@@ -518,7 +518,7 @@ export const INITIAL_CATALOG_ITEMS = [
   {
     slug: 'cpat-level-3',
     category: CatalogItemCategory.DIAGNOSTIC_TOOL,
-    pricingModel: PricingModel.FREE_THEN_PAID,
+    pricingModel: PricingModel.FIXED,
     packageLevel: 'LEVEL_3',
     nameEn: 'CPAT™ - Change Profile & Adaptability Tool - Level 3',
     nameAr: 'CPAT™ - أداة تشخيص التكيّف والتغيير - المستوى الثالث',
@@ -560,7 +560,7 @@ export const INITIAL_CATALOG_ITEMS = [
   {
     slug: 'management-drives-level-2',
     category: CatalogItemCategory.DIAGNOSTIC_TOOL,
-    pricingModel: PricingModel.FREE_THEN_PAID,
+    pricingModel: PricingModel.FIXED,
     packageLevel: 'LEVEL_2',
     nameEn: 'Management Drives™ (Individual & Group Profiles) - Level 2',
     nameAr: 'Management Drives™ (تحليل ملفات الأفراد والفرق) - المستوى الثاني',
@@ -579,7 +579,7 @@ export const INITIAL_CATALOG_ITEMS = [
   {
     slug: 'management-drives-level-3',
     category: CatalogItemCategory.DIAGNOSTIC_TOOL,
-    pricingModel: PricingModel.FREE_THEN_PAID,
+    pricingModel: PricingModel.FIXED,
     packageLevel: 'LEVEL_3',
     nameEn: 'Management Drives™ (Individual & Group Profiles) - Level 3',
     nameAr: 'Management Drives™ (تحليل ملفات الأفراد والفرق) - المستوى الثالث',

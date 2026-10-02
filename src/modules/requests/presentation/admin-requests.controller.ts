@@ -45,6 +45,13 @@ export class AdminRequestsController {
     };
   }
 
+  private authorizeRoles(req: Request, allowedRoles: string[]) {
+    const role = req.user?.staffRole;
+    if (!role || !allowedRoles.includes(role)) {
+      throw new AuthenticationError('You do not have permission to perform this action.');
+    }
+  }
+
   listRequests = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     try {
       this.getActorContext(req);
@@ -75,6 +82,7 @@ export class AdminRequestsController {
 
   startReview = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     try {
+      this.authorizeRoles(req, ['REVIEWER_OPERATOR', 'SYSTEM_ADMINISTRATOR']);
       const id = this.getRequestId(req);
       const actor = this.getActorContext(req);
       const result = await this.startReviewUseCase.execute(id, actor);
@@ -86,6 +94,7 @@ export class AdminRequestsController {
 
   requestInfo = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     try {
+      this.authorizeRoles(req, ['REVIEWER_OPERATOR', 'SYSTEM_ADMINISTRATOR']);
       const id = this.getRequestId(req);
       const actor = this.getActorContext(req);
       const result = await this.requestInfoUseCase.execute(
@@ -101,6 +110,7 @@ export class AdminRequestsController {
 
   reject = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     try {
+      this.authorizeRoles(req, ['REVIEWER_OPERATOR', 'SYSTEM_ADMINISTRATOR']);
       const id = this.getRequestId(req);
       const actor = this.getActorContext(req);
       const result = await this.rejectRequestUseCase.execute(
@@ -116,6 +126,8 @@ export class AdminRequestsController {
 
   approve = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     try {
+      this.authorizeRoles(req, ['REVIEWER_OPERATOR', 'SYSTEM_ADMINISTRATOR']);
+
       const id = this.getRequestId(req);
       const actor = this.getActorContext(req);
       const result = await this.approveRequestUseCase.execute(
@@ -134,6 +146,7 @@ export class AdminRequestsController {
 
   fulfill = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     try {
+      this.authorizeRoles(req, ['REVIEWER_OPERATOR', 'SYSTEM_ADMINISTRATOR']);
       const id = this.getRequestId(req);
       const actor = this.getActorContext(req);
       const result = await this.fulfillRequestUseCase.execute(
@@ -152,6 +165,7 @@ export class AdminRequestsController {
 
   markPaid = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     try {
+      this.authorizeRoles(req, ['FINANCE_OFFICER', 'SYSTEM_ADMINISTRATOR']);
       const id = this.getRequestId(req);
       const actor = this.getActorContext(req);
       const result = await this.markPaidUseCase.execute(

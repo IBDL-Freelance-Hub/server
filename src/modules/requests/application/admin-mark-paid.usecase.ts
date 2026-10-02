@@ -1,6 +1,6 @@
 import { PrismaClient, EngagementRequestStatus } from '@prisma/client';
 import { prisma as defaultPrisma } from '../../../shared/providers';
-import { NotFoundError, ValidationError } from '../../../shared/errors';
+import { NotFoundError, ValidationError, ConflictError } from '../../../shared/errors';
 import { assertValidRequestTransition } from '../domain/request-state-machine';
 import {
   IRequestNotificationService,
@@ -51,6 +51,7 @@ export class AdminMarkPaidUseCase {
             user: { select: { id: true, email: true } },
           },
         },
+        catalogItem: { select: { nameEn: true } },
       },
     });
 
@@ -84,70 +85,90 @@ export class AdminMarkPaidUseCase {
         : `[Payment]: ${input.adminNotes.trim()}`
       : request.adminNotes;
 
-    const updated = await this.prisma.$transaction(async (tx) => {
-      const rec = await tx.engagementRequest.update({
-        where: { id: request.id },
-        data: {
-          status: EngagementRequestStatus.PAYMENT_CONFIRMED,
-          paymentReference: refCode,
-          paidAt: now,
-          adminNotes: adminNotesCombined,
-        },
-      });
-
-      // 1. Immutable Staff AuditLog (SEC-33)
-      await tx.auditLog.create({
-        data: {
-          actorId: actor.userId,
-          actorRole: actor.staffRole,
-          action: 'ADMIN_REQUEST_MARKED_PAID',
-          resource: 'EngagementRequest',
-          resourceId: request.id,
-          reason: input.adminNotes?.trim() || `Payment recorded ref: ${refCode}`,
-          ipAddress: actor.ipAddress,
-          requestId: actor.requestId,
-          previousState: { status: request.status, paymentReference: request.paymentReference },
-          newState: {
+    const updated = await this.prisma.$transaction(
+      async (tx) => {
+        const updateResult = await tx.engagementRequest.updateMany({
+          where: { id: request.id, status: request.status },
+          data: {
             status: EngagementRequestStatus.PAYMENT_CONFIRMED,
             paymentReference: refCode,
             paidAt: now,
+            adminNotes: adminNotesCombined,
           },
-        },
-      });
+        });
 
-      // 2. Member Activity Feed Timeline Entry (ACT-58)
-      await tx.auditLog.create({
-        data: {
-          actorId: request.member.userId,
-          actorRole: 'MEMBER',
-          action: 'REQUEST_PAYMENT_CONFIRMED',
-          resource: 'EngagementRequest',
-          resourceId: request.id,
-          reason: `Payment reference: ${refCode}`,
-          previousState: { status: request.status },
-          newState: { status: EngagementRequestStatus.PAYMENT_CONFIRMED },
-        },
-      });
+        if (updateResult.count === 0) {
+          throw new ConflictError(
+            `Request status was updated concurrently. Expected '${request.status}' but it has changed. Please refresh and try again.`,
+          );
+        }
 
-      return rec;
-    });
+        // 1. Immutable Staff AuditLog (SEC-33)
+        await tx.auditLog.create({
+          data: {
+            actorId: actor.userId,
+            actorRole: actor.staffRole,
+            action: 'ADMIN_REQUEST_MARKED_PAID',
+            resource: 'EngagementRequest',
+            resourceId: request.id,
+            reason: input.adminNotes?.trim() || `Payment recorded ref: ${refCode}`,
+            ipAddress: actor.ipAddress,
+            requestId: actor.requestId,
+            previousState: { status: request.status, paymentReference: request.paymentReference },
+            newState: {
+              status: EngagementRequestStatus.PAYMENT_CONFIRMED,
+              paymentReference: refCode,
+              paidAt: now,
+            },
+          },
+        });
 
-    // 3. Dispatch Member Notification
-    await this.notificationSvc.dispatchNotification({
-      userId: request.member.userId,
-      memberEmail: request.member.user.email,
-      referenceCode: request.referenceCode,
-      type: 'REQUEST_PAYMENT_CONFIRMED',
-      titleEn: 'Payment Confirmed',
-      titleAr: 'تم تأكيد استلام الدفعة',
-      messageEn: `Payment for request (${request.referenceCode}) has been confirmed (Ref: ${refCode}). Your request is now queued for fulfillment.`,
-      messageAr: `تم تأكيد استلام دفعة الطلب (${request.referenceCode}) بنجاح (المرجع: ${refCode}). الطلب الآن في مرحلة التنفيذ.`,
-      metadata: {
-        requestId: request.id,
-        paymentReference: refCode,
-        status: EngagementRequestStatus.PAYMENT_CONFIRMED,
+        // 2. Member Activity Feed Timeline Entry (ACT-58)
+        await tx.auditLog.create({
+          data: {
+            actorId: request.member.userId,
+            actorRole: 'MEMBER',
+            action: 'REQUEST_PAYMENT_CONFIRMED',
+            resource: 'EngagementRequest',
+            resourceId: request.id,
+            reason: `Payment reference: ${refCode}`,
+            previousState: { status: request.status },
+            newState: { status: EngagementRequestStatus.PAYMENT_CONFIRMED },
+          },
+        });
+
+        // 3. Persist Notification in DB
+        const notifInput = {
+          userId: request.member.userId,
+          memberEmail: request.member.user.email,
+          referenceCode: request.referenceCode,
+          type: 'REQUEST_PAYMENT_CONFIRMED',
+          titleEn: 'Payment Confirmed',
+          titleAr: 'تم تأكيد استلام الدفعة',
+          messageEn: `Payment for request (${request.referenceCode}) has been confirmed (Ref: ${refCode}). Your request is now queued for fulfillment.`,
+          messageAr: `تم تأكيد استلام دفعة الطلب (${request.referenceCode}) بنجاح (المرجع: ${refCode}). الطلب الآن في مرحلة التنفيذ.`,
+          metadata: {
+            requestId: request.id,
+            paymentReference: refCode,
+            status: EngagementRequestStatus.PAYMENT_CONFIRMED,
+          },
+        };
+        await this.notificationSvc.saveInAppNotification(tx, notifInput);
+
+        return {
+          id: request.id,
+          referenceCode: request.referenceCode,
+          status: EngagementRequestStatus.PAYMENT_CONFIRMED,
+          paymentReference: refCode,
+          paidAt: now,
+          notifInput,
+        };
       },
-    });
+      { maxWait: 10000, timeout: 20000 },
+    );
+
+    // 4. Dispatch Email Outside Transaction
+    this.notificationSvc.dispatchEmailOnly(updated.notifInput).catch(() => {});
 
     return {
       id: updated.id,

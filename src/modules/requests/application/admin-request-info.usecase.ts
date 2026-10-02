@@ -1,6 +1,6 @@
 import { PrismaClient, EngagementRequestStatus } from '@prisma/client';
 import { prisma as defaultPrisma } from '../../../shared/providers';
-import { NotFoundError, ValidationError } from '../../../shared/errors';
+import { NotFoundError, ValidationError, ConflictError } from '../../../shared/errors';
 import { assertValidRequestTransition } from '../domain/request-state-machine';
 import {
   IRequestNotificationService,
@@ -59,14 +59,20 @@ export class AdminRequestInfoUseCase {
     const now = new Date();
 
     const updated = await this.prisma.$transaction(async (tx) => {
-      const rec = await tx.engagementRequest.update({
-        where: { id: request.id },
+      const updateResult = await tx.engagementRequest.updateMany({
+        where: { id: request.id, status: request.status },
         data: {
           status: EngagementRequestStatus.AWAITING_RESPONSE,
           reviewNotes: trimmedNotes,
           infoRequestedAt: now,
         },
       });
+
+      if (updateResult.count === 0) {
+        throw new ConflictError(
+          `Request status was updated concurrently. Expected '${request.status}' but it has changed. Please refresh and try again.`,
+        );
+      }
 
       // 1. Immutable Staff AuditLog (SEC-33)
       await tx.auditLog.create({
@@ -102,21 +108,32 @@ export class AdminRequestInfoUseCase {
         },
       });
 
-      return rec;
+      // 3. Persist Notification in DB
+      const notifInput = {
+        userId: request.member.userId,
+        memberEmail: request.member.user.email,
+        referenceCode: request.referenceCode,
+        type: 'REQUEST_INFO_REQUESTED',
+        titleEn: 'Information Requested on Your Request',
+        titleAr: 'مطلوب معلومات إضافية بخصوص طلبك',
+        messageEn: `Our review team has requested additional information regarding request (${request.referenceCode}): "${trimmedNotes}". Please review and provide the details.`,
+        messageAr: `طلب فريق المراجعة معلومات إضافية بخصوص طلبك (${request.referenceCode}): "${trimmedNotes}". يرجى المراجعة وتزويدنا بالتفاصيل المطلوبة.`,
+        metadata: { requestId: request.id, reviewNotes: trimmedNotes },
+      };
+      await this.notificationSvc.saveInAppNotification(tx, notifInput);
+
+      return {
+        id: request.id,
+        referenceCode: request.referenceCode,
+        status: EngagementRequestStatus.AWAITING_RESPONSE,
+        reviewNotes: trimmedNotes,
+        infoRequestedAt: now,
+        notifInput,
+      };
     });
 
-    // 3. Dispatch Member Notification
-    await this.notificationSvc.dispatchNotification({
-      userId: request.member.userId,
-      memberEmail: request.member.user.email,
-      referenceCode: request.referenceCode,
-      type: 'REQUEST_INFO_REQUESTED',
-      titleEn: 'Information Requested on Your Request',
-      titleAr: 'مطلوب معلومات إضافية بخصوص طلبك',
-      messageEn: `Our review team has requested additional information regarding request (${request.referenceCode}): "${trimmedNotes}". Please review and provide the details.`,
-      messageAr: `طلب فريق المراجعة معلومات إضافية بخصوص طلبك (${request.referenceCode}): "${trimmedNotes}". يرجى المراجعة وتزويدنا بالتفاصيل المطلوبة.`,
-      metadata: { requestId: request.id, reviewNotes: trimmedNotes },
-    });
+    // 4. Dispatch Email Outside Transaction
+    this.notificationSvc.dispatchEmailOnly(updated.notifInput).catch(() => {});
 
     return {
       id: updated.id,

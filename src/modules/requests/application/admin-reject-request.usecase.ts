@@ -1,6 +1,6 @@
 import { PrismaClient, EngagementRequestStatus } from '@prisma/client';
 import { prisma as defaultPrisma } from '../../../shared/providers';
-import { NotFoundError, ValidationError } from '../../../shared/errors';
+import { NotFoundError, ValidationError, ConflictError } from '../../../shared/errors';
 import { assertValidRequestTransition } from '../domain/request-state-machine';
 import {
   IRequestNotificationService,
@@ -61,14 +61,20 @@ export class AdminRejectRequestUseCase {
     const now = new Date();
 
     const updated = await this.prisma.$transaction(async (tx) => {
-      const rec = await tx.engagementRequest.update({
-        where: { id: request.id },
+      const updateResult = await tx.engagementRequest.updateMany({
+        where: { id: request.id, status: request.status },
         data: {
           status: EngagementRequestStatus.REJECTED,
           rejectionReason: trimmedReason,
           rejectedAt: now,
         },
       });
+
+      if (updateResult.count === 0) {
+        throw new ConflictError(
+          `Request status was updated concurrently. Expected '${request.status}' but it has changed. Please refresh and try again.`,
+        );
+      }
 
       // 1. Immutable Staff AuditLog (SEC-33)
       await tx.auditLog.create({
@@ -104,21 +110,32 @@ export class AdminRejectRequestUseCase {
         },
       });
 
-      return rec;
+      // 3. Persist Notification in DB
+      const notifInput = {
+        userId: request.member.userId,
+        memberEmail: request.member.user.email,
+        referenceCode: request.referenceCode,
+        type: 'REQUEST_REJECTED',
+        titleEn: 'Request Rejected',
+        titleAr: 'تم رفض الطلب',
+        messageEn: `Your request (${request.referenceCode}) has been declined. Reason: "${trimmedReason}".`,
+        messageAr: `تم رفض طلبك (${request.referenceCode}). السبب: "${trimmedReason}".`,
+        metadata: { requestId: request.id, rejectionReason: trimmedReason },
+      };
+      await this.notificationSvc.saveInAppNotification(tx, notifInput);
+
+      return {
+        id: request.id,
+        referenceCode: request.referenceCode,
+        status: EngagementRequestStatus.REJECTED,
+        rejectionReason: trimmedReason,
+        rejectedAt: now,
+        notifInput,
+      };
     });
 
-    // 3. Dispatch Member Notification
-    await this.notificationSvc.dispatchNotification({
-      userId: request.member.userId,
-      memberEmail: request.member.user.email,
-      referenceCode: request.referenceCode,
-      type: 'REQUEST_REJECTED',
-      titleEn: 'Request Rejected',
-      titleAr: 'تم رفض الطلب',
-      messageEn: `Your request (${request.referenceCode}) has been declined. Reason: "${trimmedReason}".`,
-      messageAr: `تم رفض طلبك (${request.referenceCode}). السبب: "${trimmedReason}".`,
-      metadata: { requestId: request.id, rejectionReason: trimmedReason },
-    });
+    // 4. Dispatch Email Outside Transaction
+    this.notificationSvc.dispatchEmailOnly(updated.notifInput).catch(() => {});
 
     return {
       id: updated.id,

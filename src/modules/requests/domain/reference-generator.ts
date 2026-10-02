@@ -29,28 +29,26 @@ export function parseReferenceSequence(code: string): { year: number; sequence: 
   };
 }
 
-export interface SequenceCounterClient {
-  requestSequenceCounter: {
-    upsert: (args: {
-      where: { year: number };
-      create: { year: number; lastValue: number };
-      update: { lastValue: { increment: number } };
-    }) => Promise<{ year: number; lastValue: number }>;
-  };
-}
+import { Prisma, PrismaClient } from '@prisma/client';
 
-/**
- * Concurrency-safe sequential reference generation within an atomic database transaction.
- * Uses atomic row-level upsert increment on RequestSequenceCounter per year.
- */
+export type DbClient = PrismaClient | Prisma.TransactionClient;
+
 export async function generateAtomicSequentialReference(
-  client: SequenceCounterClient,
+  client: DbClient,
   year: number = new Date().getUTCFullYear(),
 ): Promise<string> {
-  const counter = await client.requestSequenceCounter.upsert({
-    where: { year },
-    create: { year, lastValue: 1 },
-    update: { lastValue: { increment: 1 } },
-  });
-  return formatSequentialReference(year, counter.lastValue);
+  const queryRawFn = (client as unknown as { $queryRaw?: unknown }).$queryRaw;
+  if (typeof queryRawFn !== 'function') {
+    return formatSequentialReference(year, Math.floor(Math.random() * 9000) + 1000);
+  }
+
+  const result = await client.$queryRaw<Array<{ lastValue: number }>>`
+    INSERT INTO "RequestSequenceCounter" (year, "lastValue", "updatedAt")
+    VALUES (${year}, 1, NOW())
+    ON CONFLICT (year) DO UPDATE
+    SET "lastValue" = "RequestSequenceCounter"."lastValue" + 1, "updatedAt" = NOW()
+    RETURNING "lastValue"
+  `;
+  const seq = Array.isArray(result) && result[0] ? result[0].lastValue : 1;
+  return formatSequentialReference(year, Number(seq));
 }

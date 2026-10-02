@@ -6,6 +6,9 @@ import { toolSlugParamSchema, orderDiagnosticToolSchema } from './shop.schema';
 const router = Router();
 const controller = new ShopController();
 
+// GET /api/v1/shop/items — Unified Catalog Items (Tools, Services, etc)
+router.get('/items', optionalAuth, controller.listItems);
+
 // GET /api/v1/shop/tools — Diagnostic Tools Shop Catalog (PQP™, CPAT™, Management Drives®)
 router.get('/tools', optionalAuth, controller.getTools);
 

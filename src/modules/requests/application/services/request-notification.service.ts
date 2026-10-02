@@ -1,4 +1,4 @@
-import { PrismaClient } from '@prisma/client';
+import { PrismaClient, Prisma } from '@prisma/client';
 import { prisma as defaultPrisma } from '../../../../shared/providers/prisma.provider';
 import {
   IEmailProvider,
@@ -35,6 +35,11 @@ export interface SendRequestNotificationInput {
 
 export interface IRequestNotificationService {
   dispatchNotification(input: SendRequestNotificationInput): Promise<InAppNotification>;
+  dispatchEmailOnly(input: SendRequestNotificationInput): Promise<void>;
+  saveInAppNotification(
+    tx: Prisma.TransactionClient,
+    input: SendRequestNotificationInput,
+  ): Promise<string>;
   getInAppNotificationsForUser(userId: string): Promise<InAppNotification[]>;
 }
 
@@ -110,6 +115,45 @@ export class RequestNotificationService implements IRequestNotificationService {
     }
 
     return notification;
+  }
+
+  async saveInAppNotification(
+    tx: Prisma.TransactionClient,
+    input: SendRequestNotificationInput,
+  ): Promise<string> {
+    const link = input.link || `/requests/${input.referenceCode}`;
+    const persisted = await tx.notification.create({
+      data: {
+        userId: input.userId,
+        titleEn: input.titleEn,
+        titleAr: input.titleAr,
+        bodyEn: input.messageEn,
+        bodyAr: input.messageAr,
+        type: input.type,
+        isRead: false,
+        link,
+      },
+    });
+    return persisted.id;
+  }
+
+  async dispatchEmailOnly(input: SendRequestNotificationInput): Promise<void> {
+    if (input.memberEmail) {
+      try {
+        await this.emailSvc.sendEmail({
+          to: input.memberEmail,
+          subject: `[IBDL Hub] ${input.titleEn} / ${input.titleAr}`,
+          html: `<div style="font-family: sans-serif; line-height: 1.6; color: #333;">
+            <p><strong>Reference:</strong> ${input.referenceCode}</p>
+            <p>${input.messageEn}</p>
+            <hr style="border: 0; border-top: 1px solid #eee; margin: 16px 0;" />
+            <p dir="rtl">${input.messageAr}</p>
+          </div>`,
+        });
+      } catch (err) {
+        console.error('[RequestNotificationService] Failed to send email notification:', err);
+      }
+    }
   }
 
   async getInAppNotificationsForUser(userId: string): Promise<InAppNotification[]> {

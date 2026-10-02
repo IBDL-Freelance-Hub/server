@@ -5,7 +5,7 @@ import {
   AssessmentCredentialStatus,
 } from '@prisma/client';
 import { prisma as defaultPrisma } from '../../../shared/providers';
-import { NotFoundError } from '../../../shared/errors';
+import { NotFoundError, ConflictError } from '../../../shared/errors';
 import { assertValidRequestTransition } from '../domain/request-state-machine';
 import {
   IRequestNotificationService,
@@ -114,14 +114,20 @@ export class AdminFulfillRequestUseCase {
         combinedNotes = combinedNotes ? `${combinedNotes}\n${line}` : line;
       }
 
-      const rec = await tx.engagementRequest.update({
-        where: { id: request.id },
+      const updateResult = await tx.engagementRequest.updateMany({
+        where: { id: request.id, status: request.status },
         data: {
           status: EngagementRequestStatus.FULFILLED,
           fulfilledAt: now,
           adminNotes: combinedNotes,
         },
       });
+
+      if (updateResult.count === 0) {
+        throw new ConflictError(
+          `Request status was updated concurrently. Expected '${request.status}' but it has changed. Please refresh and try again.`,
+        );
+      }
 
       const auditNewState: Record<string, unknown> = {
         status: EngagementRequestStatus.FULFILLED,
@@ -161,41 +167,53 @@ export class AdminFulfillRequestUseCase {
         },
       });
 
-      return rec;
-    });
+      // 4. Persist Notification in DB
+      let fulfillmentMessageEn = `Your request (${request.referenceCode}) has been fulfilled!`;
+      let fulfillmentMessageAr = `تم تنفيذ طلبك (${request.referenceCode}) بنجاح!`;
 
-    // 4. Dispatch Member Notification
-    let fulfillmentMessageEn = `Your request (${request.referenceCode}) has been fulfilled!`;
-    let fulfillmentMessageAr = `تم تنفيذ طلبك (${request.referenceCode}) بنجاح!`;
+      if (assignedEntitlement?.username) {
+        fulfillmentMessageEn += ` Assessment Username: ${assignedEntitlement.username}.`;
+        fulfillmentMessageAr += ` اسم مستخدم التقييم: ${assignedEntitlement.username}.`;
+      }
+      if (assignedEntitlement?.accessUrl) {
+        fulfillmentMessageEn += ` Access URL: ${assignedEntitlement.accessUrl}.`;
+        fulfillmentMessageAr += ` رابط الدخول: ${assignedEntitlement.accessUrl}.`;
+      }
+      if (input.deliveryNotes?.trim()) {
+        fulfillmentMessageEn += ` Notes: ${input.deliveryNotes.trim()}`;
+        fulfillmentMessageAr += ` ملاحظات: ${input.deliveryNotes.trim()}`;
+      }
 
-    if (assignedEntitlement?.username) {
-      fulfillmentMessageEn += ` Assessment Username: ${assignedEntitlement.username}.`;
-      fulfillmentMessageAr += ` اسم مستخدم التقييم: ${assignedEntitlement.username}.`;
-    }
-    if (assignedEntitlement?.accessUrl) {
-      fulfillmentMessageEn += ` Access URL: ${assignedEntitlement.accessUrl}.`;
-      fulfillmentMessageAr += ` رابط الدخول: ${assignedEntitlement.accessUrl}.`;
-    }
-    if (input.deliveryNotes?.trim()) {
-      fulfillmentMessageEn += ` Notes: ${input.deliveryNotes.trim()}`;
-      fulfillmentMessageAr += ` ملاحظات: ${input.deliveryNotes.trim()}`;
-    }
+      const notifInput = {
+        userId: request.member.userId,
+        memberEmail: request.member.user.email,
+        referenceCode: request.referenceCode,
+        type: 'REQUEST_FULFILLED',
+        titleEn: 'Request Fulfilled',
+        titleAr: 'تم تنفيذ طلبك بنجاح',
+        messageEn: fulfillmentMessageEn,
+        messageAr: fulfillmentMessageAr,
+        metadata: {
+          requestId: request.id,
+          status: EngagementRequestStatus.FULFILLED,
+          entitlement: assignedEntitlement,
+        },
+      };
 
-    await this.notificationSvc.dispatchNotification({
-      userId: request.member.userId,
-      memberEmail: request.member.user.email,
-      referenceCode: request.referenceCode,
-      type: 'REQUEST_FULFILLED',
-      titleEn: 'Request Fulfilled',
-      titleAr: 'تم تنفيذ طلبك بنجاح',
-      messageEn: fulfillmentMessageEn,
-      messageAr: fulfillmentMessageAr,
-      metadata: {
-        requestId: request.id,
+      await this.notificationSvc.saveInAppNotification(tx, notifInput);
+
+      return {
+        id: request.id,
+        referenceCode: request.referenceCode,
         status: EngagementRequestStatus.FULFILLED,
-        entitlement: assignedEntitlement,
-      },
+        fulfilledAt: now,
+        assignedEntitlement,
+        notifInput,
+      };
     });
+
+    // 5. Dispatch Email Outside Transaction
+    this.notificationSvc.dispatchEmailOnly(updated.notifInput).catch(() => {});
 
     return {
       id: updated.id,

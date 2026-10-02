@@ -112,6 +112,31 @@ describe('SubmitUnifiedRequestUseCase Unit Tests (REQ-14, SEC-33)', () => {
     ).rejects.toThrow(ConflictError);
   });
 
+  it('should enforce REQ-14 duplicate prevention with 409 ConflictError if PAYMENT_CONFIRMED request exists (paid but unfulfilled)', async () => {
+    (mockPrisma.member.findUnique as jest.Mock).mockResolvedValue({
+      id: 'member-1',
+      userId: 'user-1',
+      memberships: [{ tier: MembershipTier.ESSENTIAL, status: MembershipStatus.ACTIVE }],
+    });
+    (mockPrisma.catalogItem.findFirst as jest.Mock).mockResolvedValue(mockCoreService);
+    (mockPrisma.engagementRequest.findFirst as jest.Mock).mockResolvedValue({
+      referenceCode: 'REQ-2026-0002',
+      status: EngagementRequestStatus.PAYMENT_CONFIRMED,
+    });
+
+    await expect(
+      useCase.execute(
+        'user-1',
+        {
+          itemSlug: 'proposal-building',
+          brief: { project_value: 50000 },
+          acknowledgement: true,
+        },
+        {},
+      ),
+    ).rejects.toThrow(ConflictError);
+  });
+
   it('should fail with ValidationError if project_value is missing for PERCENTAGE pricingModel service', async () => {
     (mockPrisma.member.findUnique as jest.Mock).mockResolvedValue({
       id: 'member-1',

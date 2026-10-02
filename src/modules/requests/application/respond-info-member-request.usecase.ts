@@ -1,6 +1,6 @@
-import { PrismaClient, EngagementRequestStatus } from '@prisma/client';
+import { PrismaClient, EngagementRequestStatus, Prisma } from '@prisma/client';
 import { prisma as defaultPrisma } from '../../../shared/providers';
-import { NotFoundError, BusinessRuleError } from '../../../shared/errors';
+import { NotFoundError, BusinessRuleError, ConflictError } from '../../../shared/errors';
 import { assertValidRequestTransition } from '../domain/request-state-machine';
 import {
   IRequestNotificationService,
@@ -9,8 +9,7 @@ import {
 
 export interface RespondInfoMemberRequestInput {
   responseNotes: string;
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  updatedBrief?: Record<string, any>;
+  updatedBrief?: Record<string, unknown>;
 }
 
 export interface RespondInfoMemberRequestResult {
@@ -60,14 +59,17 @@ export class RespondInfoMemberRequestUseCase {
     assertValidRequestTransition(request.status, EngagementRequestStatus.UNDER_REVIEW);
 
     // Merge existing brief with updatedBrief if provided
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    let newBrief: any = request.brief;
+    let newBrief: Prisma.InputJsonValue | undefined =
+      request.brief === null ? undefined : (request.brief as Prisma.InputJsonValue);
     if (input.updatedBrief && typeof input.updatedBrief === 'object') {
+      const existingBrief =
+        typeof request.brief === 'object' && request.brief !== null
+          ? (request.brief as Record<string, unknown>)
+          : {};
       newBrief = {
-        ...(typeof request.brief === 'object' && request.brief ? request.brief : {}),
+        ...existingBrief,
         ...input.updatedBrief,
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      } as any;
+      } as Prisma.InputJsonObject;
     }
 
     const newReviewNotes = request.reviewNotes
@@ -75,14 +77,20 @@ export class RespondInfoMemberRequestUseCase {
       : `[Member Response]: ${input.responseNotes}`;
 
     const updated = await this.prisma.$transaction(async (tx) => {
-      const rec = await tx.engagementRequest.update({
-        where: { id: request.id },
+      const updateResult = await tx.engagementRequest.updateMany({
+        where: { id: request.id, status: request.status },
         data: {
           status: EngagementRequestStatus.UNDER_REVIEW,
           brief: newBrief ?? undefined,
           reviewNotes: newReviewNotes,
         },
       });
+
+      if (updateResult.count === 0) {
+        throw new ConflictError(
+          `Request status was updated concurrently. Expected '${request.status}' but it has changed. Please refresh and try again.`,
+        );
+      }
 
       // 1. Immutable Audit Log for Member Response
       await tx.auditLog.create({
@@ -119,22 +127,31 @@ export class RespondInfoMemberRequestUseCase {
         },
       });
 
-      return rec;
+      // 3. Persist Notification in DB
+      const notifInput = {
+        userId: request.member.userId,
+        memberEmail: request.member.user?.email,
+        referenceCode: request.referenceCode,
+        type: 'REQUEST_INFO_PROVIDED',
+        titleEn: 'Information Submitted',
+        titleAr: 'تم تقديم المعلومات المطلوبة',
+        messageEn: `Additional information for request (${request.referenceCode}) has been submitted and is back under review.`,
+        messageAr: `تم تقديم المعلومات الإضافية للطلب (${request.referenceCode}) وهو الآن قيد المراجعة مجدداً.`,
+        link: `/requests/${request.referenceCode}`,
+        metadata: { requestId: request.id, status: EngagementRequestStatus.UNDER_REVIEW },
+      };
+      await this.notificationSvc.saveInAppNotification(tx, notifInput);
+
+      return {
+        id: request.id,
+        referenceCode: request.referenceCode,
+        status: EngagementRequestStatus.UNDER_REVIEW,
+        notifInput,
+      };
     });
 
-    // 3. Dispatch Member Notification
-    await this.notificationSvc.dispatchNotification({
-      userId: request.member.userId,
-      memberEmail: request.member.user?.email,
-      referenceCode: request.referenceCode,
-      type: 'REQUEST_INFO_PROVIDED',
-      titleEn: 'Information Submitted',
-      titleAr: 'تم تقديم المعلومات المطلوبة',
-      messageEn: `Additional information for request (${request.referenceCode}) has been submitted and is back under review.`,
-      messageAr: `تم تقديم المعلومات الإضافية للطلب (${request.referenceCode}) وهو الآن قيد المراجعة مجدداً.`,
-      link: `/requests/${request.referenceCode}`,
-      metadata: { requestId: request.id, status: EngagementRequestStatus.UNDER_REVIEW },
-    });
+    // 4. Dispatch Email Outside Transaction
+    this.notificationSvc.dispatchEmailOnly(updated.notifInput).catch(() => {});
 
     return {
       id: updated.id,

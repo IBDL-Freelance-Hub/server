@@ -1,6 +1,6 @@
 import { PrismaClient, EngagementRequestStatus } from '@prisma/client';
 import { prisma as defaultPrisma } from '../../../shared/providers';
-import { NotFoundError } from '../../../shared/errors';
+import { NotFoundError, ConflictError } from '../../../shared/errors';
 import { assertValidRequestTransition } from '../domain/request-state-machine';
 import {
   IRequestNotificationService,
@@ -52,12 +52,18 @@ export class AdminStartReviewUseCase {
     const now = new Date();
 
     const updated = await this.prisma.$transaction(async (tx) => {
-      const rec = await tx.engagementRequest.update({
-        where: { id: request.id },
+      const updateResult = await tx.engagementRequest.updateMany({
+        where: { id: request.id, status: request.status },
         data: {
           status: EngagementRequestStatus.UNDER_REVIEW,
         },
       });
+
+      if (updateResult.count === 0) {
+        throw new ConflictError(
+          `Request status was updated concurrently. Expected '${request.status}' but it has changed. Please refresh and try again.`,
+        );
+      }
 
       // 1. Immutable AuditLog for Staff Action (SEC-33)
       await tx.auditLog.create({
@@ -87,21 +93,30 @@ export class AdminStartReviewUseCase {
         },
       });
 
-      return rec;
+      // 3. Persist Notification in DB
+      const notifInput = {
+        userId: request.member.userId,
+        memberEmail: request.member.user.email,
+        referenceCode: request.referenceCode,
+        type: 'REQUEST_UNDER_REVIEW',
+        titleEn: 'Request Under Review',
+        titleAr: 'الطلب قيد المراجعة',
+        messageEn: `Your request (${request.referenceCode}) is now under review by our operations team.`,
+        messageAr: `طلبك برقم (${request.referenceCode}) قيد المراجعة حالياً من قبل فريق العمليات.`,
+        metadata: { requestId: request.id, status: EngagementRequestStatus.UNDER_REVIEW },
+      };
+      await this.notificationSvc.saveInAppNotification(tx, notifInput);
+
+      return {
+        id: request.id,
+        referenceCode: request.referenceCode,
+        status: EngagementRequestStatus.UNDER_REVIEW,
+        notifInput,
+      };
     });
 
-    // 3. Dispatch Member Notification
-    await this.notificationSvc.dispatchNotification({
-      userId: request.member.userId,
-      memberEmail: request.member.user.email,
-      referenceCode: request.referenceCode,
-      type: 'REQUEST_UNDER_REVIEW',
-      titleEn: 'Request Under Review',
-      titleAr: 'الطلب قيد المراجعة',
-      messageEn: `Your request (${request.referenceCode}) is now under review by our operations team.`,
-      messageAr: `طلبك برقم (${request.referenceCode}) قيد المراجعة حالياً من قبل فريق العمليات.`,
-      metadata: { requestId: request.id, status: EngagementRequestStatus.UNDER_REVIEW },
-    });
+    // 4. Dispatch Email Outside Transaction
+    this.notificationSvc.dispatchEmailOnly(updated.notifInput).catch(() => {});
 
     return {
       id: updated.id,

@@ -76,3 +76,10 @@ export const filesRateLimiter = createRateLimiter({
   max: 10,
   message: 'Too many file operations from this IP. Please try again later.',
 });
+
+// 6. Requests Module Rate Limiter (POST endpoints): 20 requests per 1 minute
+export const requestsRateLimiter = createRateLimiter({
+  windowMs: 60 * 1000,
+  max: 20,
+  message: 'Too many request submissions or modifications from this IP. Please try again later.',
+});

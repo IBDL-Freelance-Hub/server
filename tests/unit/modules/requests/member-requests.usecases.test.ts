@@ -86,6 +86,8 @@ describe('Member Requests, Tracking & Cancellation Unit Tests (Step 5)', () => {
         createdAt: new Date(),
         isRead: false,
       }),
+      dispatchEmailOnly: jest.fn().mockResolvedValue(undefined),
+      saveInAppNotification: jest.fn().mockResolvedValue(undefined),
       getInAppNotificationsForUser: jest.fn().mockResolvedValue([]),
     };
 
@@ -99,6 +101,7 @@ describe('Member Requests, Tracking & Cancellation Unit Tests (Step 5)', () => {
         findUnique: jest.fn(),
         findFirst: jest.fn(),
         update: jest.fn(),
+        updateMany: jest.fn().mockResolvedValue({ count: 1 }),
       },
       auditLog: {
         create: jest.fn().mockResolvedValue({ id: 'audit-log-1' }),
@@ -129,7 +132,6 @@ describe('Member Requests, Tracking & Cancellation Unit Tests (Step 5)', () => {
       );
       expect(result.requests).toHaveLength(1);
       expect(result.requests[0]!.referenceCode).toBe('REQ-2026-A8K2');
-      expect(result.requests[0]!.brief).toEqual({ description: 'TNA consulting support needed' });
       expect(result.requests[0]!.timestamps.createdAt).toBe(
         mockRequestRecord.createdAt.toISOString(),
       );
@@ -279,7 +281,8 @@ describe('Member Requests, Tracking & Cancellation Unit Tests (Step 5)', () => {
       );
 
       // Member notification dispatched
-      expect(mockNotificationSvc.dispatchNotification).toHaveBeenCalledWith(
+      expect(mockNotificationSvc.saveInAppNotification).toHaveBeenCalledWith(
+        expect.anything(),
         expect.objectContaining({
           userId: 'user-uuid-1',
           type: 'REQUEST_CANCELLED',
@@ -369,7 +372,8 @@ describe('Member Requests, Tracking & Cancellation Unit Tests (Step 5)', () => {
       );
 
       // Bilingual Notification dispatch verification
-      expect(mockNotificationSvc.dispatchNotification).toHaveBeenCalledWith(
+      expect(mockNotificationSvc.saveInAppNotification).toHaveBeenCalledWith(
+        expect.anything(),
         expect.objectContaining({
           userId: 'user-uuid-1',
           referenceCode: 'REQ-2026-A8K2',

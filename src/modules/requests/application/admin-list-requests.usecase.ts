@@ -95,7 +95,23 @@ export class AdminListRequestsUseCase {
       this.prisma.engagementRequest.count({ where }),
       this.prisma.engagementRequest.findMany({
         where,
-        include: {
+        select: {
+          id: true,
+          referenceCode: true,
+          category: true,
+          pricingModel: true,
+          status: true,
+          tierAtRequest: true,
+          membershipStatusAtRequest: true,
+          basePrice: true,
+          discountAmount: true,
+          finalPrice: true,
+          currency: true,
+          isQuarterlyEntitlement: true,
+          paymentReference: true,
+          paidAt: true,
+          createdAt: true,
+          updatedAt: true,
           member: {
             select: {
               id: true,

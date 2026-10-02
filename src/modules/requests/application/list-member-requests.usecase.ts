@@ -31,7 +31,6 @@ export interface MemberRequestSummaryDTO {
   isQuarterlyEntitlementApplied: boolean;
   quarterIndex: number | null;
   membershipYear: number | null;
-  brief: unknown;
   timestamps: {
     createdAt: string;
     infoRequestedAt: string | null;
@@ -94,7 +93,25 @@ export class ListMemberRequestsUseCase {
       this.prisma.engagementRequest.count({ where }),
       this.prisma.engagementRequest.findMany({
         where,
-        include: {
+        select: {
+          id: true,
+          referenceCode: true,
+          category: true,
+          pricingModel: true,
+          status: true,
+          finalPrice: true,
+          currency: true,
+          isQuarterlyEntitlement: true,
+          quarterIndex: true,
+          membershipYear: true,
+          createdAt: true,
+          infoRequestedAt: true,
+          approvedAt: true,
+          paidAt: true,
+          fulfilledAt: true,
+          cancelledAt: true,
+          rejectedAt: true,
+          updatedAt: true,
           catalogItem: {
             select: {
               nameEn: true,
@@ -140,7 +157,6 @@ export class ListMemberRequestsUseCase {
         isQuarterlyEntitlementApplied: req.isQuarterlyEntitlement,
         quarterIndex: req.quarterIndex,
         membershipYear: req.membershipYear,
-        brief: req.brief,
         timestamps: {
           createdAt: req.createdAt.toISOString(),
           infoRequestedAt: req.infoRequestedAt?.toISOString() ?? null,
