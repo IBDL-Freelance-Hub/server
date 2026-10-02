@@ -24,6 +24,8 @@ import adminRequestsRouter from './modules/requests/presentation/admin-requests.
 import { notificationsRouter } from './modules/notifications/presentation/notifications.routes';
 import { transactionsRouter } from './modules/transactions/presentation/transactions.routes';
 import { adminTransactionsRouter } from './modules/transactions/presentation/admin-transactions.routes';
+import { communityRouter } from './modules/community/presentation/community.routes';
+import { adminCommunityRouter } from './modules/community/presentation/admin-community.routes';
 
 const app: Express = express();
 
@@ -146,6 +148,8 @@ app.use('/api/v1/admin/requests', adminRequestsRouter);
 app.use('/api/v1/notifications', notificationsRouter);
 app.use('/api/v1/transactions', transactionsRouter);
 app.use('/api/v1/admin/transactions', adminTransactionsRouter);
+app.use('/api/v1/community', communityRouter);
+app.use('/api/v1/admin/community', adminCommunityRouter);
 
 // 11. Catch-All 404 Route Handler
 app.use((req: Request, _res: Response, next: NextFunction) => {
