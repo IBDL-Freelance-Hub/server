@@ -1,5 +1,9 @@
 import { Router } from 'express';
-import { requireAuth, validateRequest } from '../../../shared/middleware';
+import {
+  requireAuth,
+  validateRequest,
+  communityInteractionRateLimiter,
+} from '../../../shared/middleware';
 import { CommunityController } from './community.controller';
 import {
   listCommunityPostsQuerySchema,
@@ -35,6 +39,7 @@ router.get(
 // POST /api/v1/community/posts/:id/comments — Add a comment
 router.post(
   '/posts/:id/comments',
+  communityInteractionRateLimiter,
   validateRequest({
     params: communityPostIdParamSchema,
     body: addPostCommentSchema,
@@ -45,6 +50,7 @@ router.post(
 // POST /api/v1/community/posts/:id/react — Toggle reaction
 router.post(
   '/posts/:id/react',
+  communityInteractionRateLimiter,
   validateRequest({
     params: communityPostIdParamSchema,
     body: togglePostReactionSchema,

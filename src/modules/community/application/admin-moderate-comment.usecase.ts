@@ -15,38 +15,41 @@ export class AdminModerateCommentUseCase {
       throw new NotFoundError(`Comment with ID '${commentId}' not found.`);
     }
 
-    await this.prisma.$transaction(async (tx) => {
-      if (hardDelete) {
-        await tx.postComment.delete({
-          where: { id: commentId },
-        });
-      } else {
-        await tx.postComment.update({
-          where: { id: commentId },
-          data: { isDeleted: true },
-        });
-      }
+    await this.prisma.$transaction(
+      async (tx) => {
+        if (hardDelete) {
+          await tx.postComment.delete({
+            where: { id: commentId },
+          });
+        } else {
+          await tx.postComment.update({
+            where: { id: commentId },
+            data: { isDeleted: true },
+          });
+        }
 
-      await tx.auditLog.create({
-        data: {
-          actorId: actor.userId,
-          actorRole: actor.role,
-          action: hardDelete ? 'COMMUNITY_COMMENT_HARD_DELETED' : 'COMMUNITY_COMMENT_MODERATED',
-          resource: 'PostComment',
-          resourceId: commentId,
-          reason: hardDelete
-            ? `Moderator permanently deleted comment '${commentId}'`
-            : `Moderator soft-deleted comment '${commentId}'`,
-          ipAddress: actor.ipAddress,
-          requestId: actor.requestId,
-          previousState: {
-            postId: existing.postId,
-            userId: existing.userId,
-            isDeleted: existing.isDeleted,
+        await tx.auditLog.create({
+          data: {
+            actorId: actor.userId,
+            actorRole: actor.role,
+            action: hardDelete ? 'COMMUNITY_COMMENT_HARD_DELETED' : 'COMMUNITY_COMMENT_MODERATED',
+            resource: 'PostComment',
+            resourceId: commentId,
+            reason: hardDelete
+              ? `Moderator permanently deleted comment '${commentId}'`
+              : `Moderator soft-deleted comment '${commentId}'`,
+            ipAddress: actor.ipAddress,
+            requestId: actor.requestId,
+            previousState: {
+              postId: existing.postId,
+              userId: existing.userId,
+              isDeleted: existing.isDeleted,
+            },
           },
-        },
-      });
-    });
+        });
+      },
+      { maxWait: 5000, timeout: 10000 },
+    );
 
     return {
       id: commentId,

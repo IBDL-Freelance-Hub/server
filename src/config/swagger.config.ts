@@ -44,6 +44,14 @@ const options: swaggerJsdoc.Options = {
         description: 'Financial ledger & itemized invoices for members',
       },
       { name: 'Admin Transactions', description: 'Staff accounting and ledger lookup' },
+      {
+        name: 'Community',
+        description: 'Member community feed, announcements, comments & reactions',
+      },
+      {
+        name: 'Admin Community',
+        description: 'Staff community post creation, pinning, moderation & archive',
+      },
     ],
     components: {
       securitySchemes: {
@@ -827,6 +835,109 @@ const options: swaggerJsdoc.Options = {
             paymentReference: { type: 'string', example: 'TXN-BANK-998822' },
             paidAt: { type: 'string', format: 'date-time', nullable: true },
             createdAt: { type: 'string', format: 'date-time' },
+          },
+        },
+        AddPostCommentInput: {
+          type: 'object',
+          required: ['content'],
+          properties: {
+            content: {
+              type: 'string',
+              minLength: 1,
+              maxLength: 1000,
+              example: 'This is a very insightful announcement. Thank you!',
+            },
+          },
+        },
+        TogglePostReactionInput: {
+          type: 'object',
+          properties: {
+            type: {
+              type: 'string',
+              enum: ['LIKE', 'CELEBRATE', 'SUPPORT', 'INSIGHTFUL'],
+              default: 'LIKE',
+              example: 'LIKE',
+            },
+          },
+        },
+        AdminCreatePostInput: {
+          type: 'object',
+          required: ['title', 'content'],
+          properties: {
+            title: {
+              type: 'string',
+              minLength: 3,
+              maxLength: 200,
+              example: 'Important Update: New Freelancer Benefits Released',
+            },
+            content: {
+              type: 'string',
+              minLength: 1,
+              maxLength: 50000,
+              example: 'We are thrilled to announce new benefits for all IBDL members...',
+            },
+            category: {
+              type: 'string',
+              enum: ['ANNOUNCEMENT', 'OPPORTUNITY', 'GENERAL', 'EVENT'],
+              default: 'ANNOUNCEMENT',
+              example: 'ANNOUNCEMENT',
+            },
+            status: {
+              type: 'string',
+              enum: ['DRAFT', 'PUBLISHED', 'ARCHIVED'],
+              default: 'PUBLISHED',
+              example: 'PUBLISHED',
+            },
+            isPinned: {
+              type: 'boolean',
+              default: false,
+              example: true,
+            },
+            attachments: {
+              type: 'array',
+              items: {
+                type: 'object',
+                required: ['name', 'url'],
+                properties: {
+                  name: { type: 'string', example: 'benefits_guide.pdf' },
+                  url: {
+                    type: 'string',
+                    format: 'uri',
+                    example: 'https://files.ibdl.net/docs/guide.pdf',
+                  },
+                  size: { type: 'integer', example: 102400 },
+                  type: { type: 'string', example: 'application/pdf' },
+                },
+              },
+            },
+          },
+        },
+        AdminUpdatePostInput: {
+          type: 'object',
+          properties: {
+            title: { type: 'string', minLength: 3, maxLength: 200 },
+            content: { type: 'string', minLength: 1, maxLength: 50000 },
+            category: {
+              type: 'string',
+              enum: ['ANNOUNCEMENT', 'OPPORTUNITY', 'GENERAL', 'EVENT'],
+            },
+            status: {
+              type: 'string',
+              enum: ['DRAFT', 'PUBLISHED', 'ARCHIVED'],
+            },
+            isPinned: { type: 'boolean' },
+            attachments: {
+              type: 'array',
+              items: {
+                type: 'object',
+                properties: {
+                  name: { type: 'string' },
+                  url: { type: 'string', format: 'uri' },
+                  size: { type: 'integer' },
+                  type: { type: 'string' },
+                },
+              },
+            },
           },
         },
       },
@@ -2841,6 +2952,300 @@ const options: swaggerJsdoc.Options = {
             },
             '404': {
               description: 'Invoice not found',
+            },
+          },
+        },
+      },
+      '/api/v1/community/posts': {
+        get: {
+          tags: ['Community'],
+          summary: 'List Community Posts',
+          description:
+            'Retrieves published community announcements, opportunities, events, and general posts with pagination, search, and reaction counts.',
+          security: [{ cookieAuth: [] }, { bearerAuth: [] }],
+          parameters: [
+            {
+              name: 'category',
+              in: 'query',
+              schema: {
+                type: 'string',
+                enum: ['ANNOUNCEMENT', 'OPPORTUNITY', 'GENERAL', 'EVENT'],
+              },
+            },
+            {
+              name: 'search',
+              in: 'query',
+              schema: { type: 'string' },
+            },
+            {
+              name: 'page',
+              in: 'query',
+              schema: { type: 'integer', default: 1 },
+            },
+            {
+              name: 'limit',
+              in: 'query',
+              schema: { type: 'integer', default: 10 },
+            },
+          ],
+          responses: {
+            '200': {
+              description: 'List of community posts',
+            },
+            '401': {
+              description: 'Authentication required',
+            },
+          },
+        },
+      },
+      '/api/v1/community/posts/{id}': {
+        get: {
+          tags: ['Community'],
+          summary: 'Get Community Post Details',
+          description: 'Retrieves a single community post with all active comments and reactions.',
+          security: [{ cookieAuth: [] }, { bearerAuth: [] }],
+          parameters: [
+            {
+              name: 'id',
+              in: 'path',
+              required: true,
+              schema: { type: 'string', format: 'uuid' },
+            },
+          ],
+          responses: {
+            '200': {
+              description: 'Post details with comments',
+            },
+            '400': {
+              description: 'Invalid post ID format',
+            },
+            '401': {
+              description: 'Authentication required',
+            },
+            '404': {
+              description: 'Post not found',
+            },
+          },
+        },
+      },
+      '/api/v1/community/posts/{id}/comments': {
+        post: {
+          tags: ['Community'],
+          summary: 'Add Comment to Post',
+          description: 'Adds a member comment to a published community post.',
+          security: [{ cookieAuth: [] }, { bearerAuth: [] }],
+          parameters: [
+            {
+              name: 'id',
+              in: 'path',
+              required: true,
+              schema: { type: 'string', format: 'uuid' },
+            },
+          ],
+          requestBody: {
+            required: true,
+            content: {
+              'application/json': {
+                schema: { $ref: '#/components/schemas/AddPostCommentInput' },
+              },
+            },
+          },
+          responses: {
+            '201': {
+              description: 'Comment added successfully',
+            },
+            '400': {
+              description: 'Validation failed: comment content required',
+            },
+            '401': {
+              description: 'Authentication required',
+            },
+            '404': {
+              description: 'Post not found',
+            },
+          },
+        },
+      },
+      '/api/v1/community/posts/{id}/react': {
+        post: {
+          tags: ['Community'],
+          summary: 'Toggle Post Reaction',
+          description:
+            'Toggles a member reaction (LIKE, CELEBRATE, SUPPORT, INSIGHTFUL) on a community post.',
+          security: [{ cookieAuth: [] }, { bearerAuth: [] }],
+          parameters: [
+            {
+              name: 'id',
+              in: 'path',
+              required: true,
+              schema: { type: 'string', format: 'uuid' },
+            },
+          ],
+          requestBody: {
+            required: false,
+            content: {
+              'application/json': {
+                schema: { $ref: '#/components/schemas/TogglePostReactionInput' },
+              },
+            },
+          },
+          responses: {
+            '200': {
+              description: 'Reaction toggled successfully',
+            },
+            '400': {
+              description: 'Invalid reaction type',
+            },
+            '401': {
+              description: 'Authentication required',
+            },
+            '404': {
+              description: 'Post not found',
+            },
+          },
+        },
+      },
+      '/api/v1/admin/community/posts': {
+        post: {
+          tags: ['Admin Community'],
+          summary: 'Create Community Post (Staff)',
+          description:
+            'Creates a community announcement, opportunity, or event with attachments. Restricted to COMMUNITY_MODERATOR or SYSTEM_ADMINISTRATOR.',
+          security: [{ cookieAuth: [] }, { bearerAuth: [] }],
+          requestBody: {
+            required: true,
+            content: {
+              'application/json': {
+                schema: { $ref: '#/components/schemas/AdminCreatePostInput' },
+              },
+            },
+          },
+          responses: {
+            '201': {
+              description: 'Post created successfully',
+            },
+            '400': {
+              description: 'Validation failed: title and content required',
+            },
+            '401': {
+              description: 'Authentication required',
+            },
+            '403': {
+              description: 'Forbidden: staff role required',
+            },
+          },
+        },
+      },
+      '/api/v1/admin/community/posts/{id}': {
+        patch: {
+          tags: ['Admin Community'],
+          summary: 'Update Community Post (Staff)',
+          description:
+            'Updates post details, pinning status, or status. Restricted to COMMUNITY_MODERATOR or SYSTEM_ADMINISTRATOR.',
+          security: [{ cookieAuth: [] }, { bearerAuth: [] }],
+          parameters: [
+            {
+              name: 'id',
+              in: 'path',
+              required: true,
+              schema: { type: 'string', format: 'uuid' },
+            },
+          ],
+          requestBody: {
+            required: true,
+            content: {
+              'application/json': {
+                schema: { $ref: '#/components/schemas/AdminUpdatePostInput' },
+              },
+            },
+          },
+          responses: {
+            '200': {
+              description: 'Post updated successfully',
+            },
+            '400': {
+              description: 'Validation failed',
+            },
+            '401': {
+              description: 'Authentication required',
+            },
+            '403': {
+              description: 'Forbidden: staff role required',
+            },
+            '404': {
+              description: 'Post not found',
+            },
+          },
+        },
+        delete: {
+          tags: ['Admin Community'],
+          summary: 'Delete or Archive Post (Staff)',
+          description:
+            'Soft-archives (default) or hard-deletes (hard=true) a post. Restricted to COMMUNITY_MODERATOR or SYSTEM_ADMINISTRATOR.',
+          security: [{ cookieAuth: [] }, { bearerAuth: [] }],
+          parameters: [
+            {
+              name: 'id',
+              in: 'path',
+              required: true,
+              schema: { type: 'string', format: 'uuid' },
+            },
+            {
+              name: 'hard',
+              in: 'query',
+              description: 'Set to true to hard-delete post instead of archiving',
+              schema: { type: 'boolean', default: false },
+            },
+          ],
+          responses: {
+            '200': {
+              description: 'Post archived or deleted successfully',
+            },
+            '400': {
+              description: 'Invalid post ID',
+            },
+            '401': {
+              description: 'Authentication required',
+            },
+            '403': {
+              description: 'Forbidden: staff role required',
+            },
+            '404': {
+              description: 'Post not found',
+            },
+          },
+        },
+      },
+      '/api/v1/admin/community/comments/{commentId}': {
+        delete: {
+          tags: ['Admin Community'],
+          summary: 'Moderate / Delete Comment (Staff)',
+          description:
+            'Moderates / soft-deletes an inappropriate comment. Restricted to COMMUNITY_MODERATOR or SYSTEM_ADMINISTRATOR.',
+          security: [{ cookieAuth: [] }, { bearerAuth: [] }],
+          parameters: [
+            {
+              name: 'commentId',
+              in: 'path',
+              required: true,
+              schema: { type: 'string', format: 'uuid' },
+            },
+          ],
+          responses: {
+            '200': {
+              description: 'Comment moderated successfully',
+            },
+            '400': {
+              description: 'Invalid comment ID',
+            },
+            '401': {
+              description: 'Authentication required',
+            },
+            '403': {
+              description: 'Forbidden: staff role required',
+            },
+            '404': {
+              description: 'Comment not found',
             },
           },
         },

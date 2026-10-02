@@ -42,47 +42,50 @@ export class AdminUpdatePostUseCase {
       }
     }
 
-    const updated = await this.prisma.$transaction(async (tx) => {
-      const post = await tx.communityPost.update({
-        where: { id: postId },
-        data,
-        include: {
-          author: {
-            select: {
-              id: true,
-              email: true,
-              staff: { select: { role: true } },
-              member: { select: { fullNameEn: true } },
+    const updated = await this.prisma.$transaction(
+      async (tx) => {
+        const post = await tx.communityPost.update({
+          where: { id: postId },
+          data,
+          include: {
+            author: {
+              select: {
+                id: true,
+                email: true,
+                staff: { select: { role: true } },
+                member: { select: { fullNameEn: true } },
+              },
             },
           },
-        },
-      });
+        });
 
-      await tx.auditLog.create({
-        data: {
-          actorId: actor.userId,
-          actorRole: actor.role,
-          action: 'COMMUNITY_POST_UPDATED',
-          resource: 'CommunityPost',
-          resourceId: post.id,
-          reason: `Updated community post '${post.id}'`,
-          ipAddress: actor.ipAddress,
-          requestId: actor.requestId,
-          previousState: {
-            title: existing.title,
-            status: existing.status,
-            isPinned: existing.isPinned,
+        await tx.auditLog.create({
+          data: {
+            actorId: actor.userId,
+            actorRole: actor.role,
+            action: 'COMMUNITY_POST_UPDATED',
+            resource: 'CommunityPost',
+            resourceId: post.id,
+            reason: `Updated community post '${post.id}'`,
+            ipAddress: actor.ipAddress,
+            requestId: actor.requestId,
+            previousState: {
+              title: existing.title,
+              status: existing.status,
+              isPinned: existing.isPinned,
+            },
+            newState: {
+              title: post.title,
+              status: post.status,
+              isPinned: post.isPinned,
+            },
           },
-          newState: {
-            title: post.title,
-            status: post.status,
-            isPinned: post.isPinned,
-          },
-        },
-      });
+        });
 
-      return post;
-    });
+        return post;
+      },
+      { maxWait: 5000, timeout: 10000 },
+    );
 
     return updated;
   }

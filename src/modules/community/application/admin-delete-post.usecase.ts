@@ -15,35 +15,40 @@ export class AdminDeletePostUseCase {
       throw new NotFoundError(`Community post with ID '${postId}' not found.`);
     }
 
-    await this.prisma.$transaction(async (tx) => {
-      if (hardDelete) {
-        await tx.communityPost.delete({
-          where: { id: postId },
-        });
-      } else {
-        await tx.communityPost.update({
-          where: { id: postId },
-          data: { status: PostStatus.ARCHIVED },
-        });
-      }
+    await this.prisma.$transaction(
+      async (tx) => {
+        if (hardDelete) {
+          await tx.communityPost.delete({
+            where: { id: postId },
+          });
+        } else {
+          await tx.communityPost.update({
+            where: { id: postId },
+            data: { status: PostStatus.ARCHIVED },
+          });
+        }
 
-      await tx.auditLog.create({
-        data: {
-          actorId: actor.userId,
-          actorRole: actor.role,
-          action: hardDelete ? 'COMMUNITY_POST_HARD_DELETED' : 'COMMUNITY_POST_ARCHIVED',
-          resource: 'CommunityPost',
-          resourceId: postId,
-          reason: hardDelete ? `Permanently deleted post '${postId}'` : `Archived post '${postId}'`,
-          ipAddress: actor.ipAddress,
-          requestId: actor.requestId,
-          previousState: {
-            title: existing.title,
-            status: existing.status,
+        await tx.auditLog.create({
+          data: {
+            actorId: actor.userId,
+            actorRole: actor.role,
+            action: hardDelete ? 'COMMUNITY_POST_HARD_DELETED' : 'COMMUNITY_POST_ARCHIVED',
+            resource: 'CommunityPost',
+            resourceId: postId,
+            reason: hardDelete
+              ? `Permanently deleted post '${postId}'`
+              : `Archived post '${postId}'`,
+            ipAddress: actor.ipAddress,
+            requestId: actor.requestId,
+            previousState: {
+              title: existing.title,
+              status: existing.status,
+            },
           },
-        },
-      });
-    });
+        });
+      },
+      { maxWait: 5000, timeout: 10000 },
+    );
 
     return {
       id: postId,

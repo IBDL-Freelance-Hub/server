@@ -1,9 +1,12 @@
 import { z } from 'zod';
 import { PostCategory } from '@prisma/client';
 
+export const ALLOWED_REACTION_TYPES = ['LIKE', 'CELEBRATE', 'SUPPORT', 'INSIGHTFUL'] as const;
+export type AllowedReactionType = (typeof ALLOWED_REACTION_TYPES)[number];
+
 export const listCommunityPostsQuerySchema = z.object({
   category: z.nativeEnum(PostCategory).optional(),
-  search: z.string().trim().optional(),
+  search: z.string().trim().max(100, 'Search query cannot exceed 100 characters').optional(),
   page: z
     .string()
     .optional()
@@ -25,7 +28,14 @@ export const addPostCommentSchema = z.object({
 });
 
 export const togglePostReactionSchema = z.object({
-  type: z.string().trim().toUpperCase().optional().default('LIKE'),
+  type: z
+    .enum(ALLOWED_REACTION_TYPES, {
+      errorMap: () => ({
+        message: `Reaction type must be one of: ${ALLOWED_REACTION_TYPES.join(', ')}`,
+      }),
+    })
+    .optional()
+    .default('LIKE'),
 });
 
 export const communityPostIdParamSchema = z.object({

@@ -18,6 +18,12 @@ import {
   NotFoundError,
   ValidationError,
 } from '../../../../src/shared/errors';
+import {
+  togglePostReactionSchema,
+  listCommunityPostsQuerySchema,
+  ALLOWED_REACTION_TYPES,
+} from '../../../../src/modules/community/presentation/community.schema';
+import { adminCreatePostSchema } from '../../../../src/modules/community/presentation/admin-community.schema';
 
 describe('Community & Announcements Module Unit Tests', () => {
   let mockReq: Partial<Request>;
@@ -629,6 +635,202 @@ describe('Community & Announcements Module Unit Tests', () => {
       expect(mockPrisma.postReaction.delete).toHaveBeenCalledWith({
         where: { id: 'react-existing' },
       });
+    });
+
+    it('getPost: should throw NotFoundError when a non-staff MEMBER requests a DRAFT post (SEC-COMM-001)', async () => {
+      mockReq.user = { id: 'member-1', userType: 'MEMBER' } as any;
+      mockReq.params = { id: 'draft-post' };
+      mockPrisma.communityPost.findUnique.mockResolvedValue({
+        id: 'draft-post',
+        status: PostStatus.DRAFT,
+      });
+
+      await controller.getPost(mockReq as Request, mockRes as Response, mockNext);
+      expect(mockNext).toHaveBeenCalledWith(expect.any(NotFoundError));
+    });
+
+    it('getPost: should allow STAFF to preview a DRAFT post', async () => {
+      mockReq.user = {
+        id: 'staff-1',
+        userType: 'STAFF',
+        staffRole: StaffRole.COMMUNITY_MODERATOR,
+      } as any;
+      mockReq.params = { id: 'draft-post' };
+      mockPrisma.communityPost.findUnique.mockResolvedValue({
+        id: 'draft-post',
+        title: 'Draft Announcement',
+        content: 'Internal draft',
+        category: PostCategory.ANNOUNCEMENT,
+        status: PostStatus.DRAFT,
+        isPinned: false,
+        attachments: null,
+        publishedAt: null,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+        author: {
+          id: 'staff-1',
+          email: 'mod@ibdl.net',
+          staff: { role: StaffRole.COMMUNITY_MODERATOR },
+          member: null,
+        },
+        _count: { comments: 0, reactions: 0 },
+        reactions: [],
+        comments: [],
+      });
+
+      await controller.getPost(mockReq as Request, mockRes as Response, mockNext);
+      expect(mockRes.status).toHaveBeenCalledWith(200);
+      expect(mockRes.json).toHaveBeenCalledWith(
+        expect.objectContaining({
+          success: true,
+          data: expect.objectContaining({ id: 'draft-post', status: PostStatus.DRAFT }),
+        }),
+      );
+    });
+
+    it('getPost: should cap comments at 100 in database query (SEC-COMM-002)', async () => {
+      mockReq.params = { id: 'post-1' };
+      mockPrisma.communityPost.findUnique.mockResolvedValue({
+        id: 'post-1',
+        title: 'Popular Post',
+        content: 'Lots of discussion',
+        category: PostCategory.ANNOUNCEMENT,
+        status: PostStatus.PUBLISHED,
+        isPinned: false,
+        attachments: null,
+        publishedAt: new Date(),
+        createdAt: new Date(),
+        updatedAt: new Date(),
+        author: { id: 'a1', email: 'a@ibdl.net', staff: null, member: null },
+        _count: { comments: 500, reactions: 10 },
+        reactions: [],
+        comments: [],
+      });
+
+      await controller.getPost(mockReq as Request, mockRes as Response, mockNext);
+
+      expect(mockPrisma.communityPost.findUnique).toHaveBeenCalledWith(
+        expect.objectContaining({
+          include: expect.objectContaining({
+            comments: expect.objectContaining({
+              take: 100,
+            }),
+          }),
+        }),
+      );
+    });
+
+    it('toggleReaction: should handle concurrent create race (P2002) without failing (SEC-COMM-004)', async () => {
+      mockReq.user = { id: 'member-1' } as any;
+      mockReq.params = { id: 'post-1' };
+      mockReq.body = { type: 'LIKE' };
+
+      mockPrisma.communityPost.findUnique.mockResolvedValue({
+        id: 'post-1',
+        status: PostStatus.PUBLISHED,
+      });
+      mockPrisma.postReaction.findUnique.mockResolvedValue(null);
+      const p2002Error = new Error('Unique constraint failed');
+      (p2002Error as any).code = 'P2002';
+      Object.setPrototypeOf(
+        p2002Error,
+        (mockPrisma.PrismaClientKnownRequestError || Error).prototype,
+      );
+      mockPrisma.postReaction.create.mockRejectedValue(p2002Error);
+      mockPrisma.postReaction.count.mockResolvedValue(1);
+
+      await controller.toggleReaction(mockReq as Request, mockRes as Response, mockNext);
+
+      expect(mockRes.status).toHaveBeenCalledWith(200);
+      expect(mockRes.json).toHaveBeenCalledWith(
+        expect.objectContaining({
+          success: true,
+          data: expect.objectContaining({ reacted: true }),
+        }),
+      );
+    });
+
+    it('toggleReaction: should handle concurrent delete race (P2025) without failing (SEC-COMM-004)', async () => {
+      mockReq.user = { id: 'member-1' } as any;
+      mockReq.params = { id: 'post-1' };
+      mockReq.body = { type: 'LIKE' };
+
+      mockPrisma.communityPost.findUnique.mockResolvedValue({
+        id: 'post-1',
+        status: PostStatus.PUBLISHED,
+      });
+      mockPrisma.postReaction.findUnique.mockResolvedValue({ id: 'react-1' });
+      const p2025Error = new Error('Record to delete does not exist');
+      (p2025Error as any).code = 'P2025';
+      Object.setPrototypeOf(
+        p2025Error,
+        (mockPrisma.PrismaClientKnownRequestError || Error).prototype,
+      );
+      mockPrisma.postReaction.delete.mockRejectedValue(p2025Error);
+      mockPrisma.postReaction.count.mockResolvedValue(0);
+
+      await controller.toggleReaction(mockReq as Request, mockRes as Response, mockNext);
+
+      expect(mockRes.status).toHaveBeenCalledWith(200);
+      expect(mockRes.json).toHaveBeenCalledWith(
+        expect.objectContaining({
+          success: true,
+          data: expect.objectContaining({ reacted: false }),
+        }),
+      );
+    });
+  });
+
+  describe('4. Input Boundaries & Security Schemas (SEC-COMM-003, SEC-COMM-005)', () => {
+    it('togglePostReactionSchema: should accept whitelisted reaction types', () => {
+      for (const type of ALLOWED_REACTION_TYPES) {
+        const result = togglePostReactionSchema.safeParse({ type });
+        expect(result.success).toBe(true);
+      }
+    });
+
+    it('togglePostReactionSchema: should default to LIKE when type omitted', () => {
+      const result = togglePostReactionSchema.safeParse({});
+      expect(result.success).toBe(true);
+      if (result.success) {
+        expect(result.data.type).toBe('LIKE');
+      }
+    });
+
+    it('togglePostReactionSchema: should reject arbitrary or invalid reaction types (SEC-COMM-003)', () => {
+      const invalidTypes = ['DISLIKE', 'ANGRY', 'SPAM', 'HATE', ''];
+      for (const type of invalidTypes) {
+        const result = togglePostReactionSchema.safeParse({ type });
+        expect(result.success).toBe(false);
+      }
+    });
+
+    it('listCommunityPostsQuerySchema: should reject search queries longer than 100 characters (SEC-COMM-005)', () => {
+      const longSearch = 'a'.repeat(101);
+      const result = listCommunityPostsQuerySchema.safeParse({ search: longSearch });
+      expect(result.success).toBe(false);
+    });
+
+    it('adminCreatePostSchema: should reject post content exceeding 50,000 characters', () => {
+      const hugeContent = 'a'.repeat(50001);
+      const result = adminCreatePostSchema.safeParse({
+        title: 'Valid Title',
+        content: hugeContent,
+      });
+      expect(result.success).toBe(false);
+    });
+
+    it('adminCreatePostSchema: should reject post with more than 10 attachments', () => {
+      const attachments = Array.from({ length: 11 }, (_, i) => ({
+        name: `doc-${i}.pdf`,
+        url: `https://storage.ibdl.net/doc-${i}.pdf`,
+      }));
+      const result = adminCreatePostSchema.safeParse({
+        title: 'Valid Title',
+        content: 'Valid content',
+        attachments,
+      });
+      expect(result.success).toBe(false);
     });
   });
 });

@@ -44,8 +44,9 @@ export class CommunityController {
     try {
       const currentUserId = req.user?.id;
       const id = req.params.id as string;
+      const isStaff = Boolean(req.user?.staffRole || req.user?.userType === 'STAFF');
 
-      const post = await this.getPostUseCase.execute(id, currentUserId);
+      const post = await this.getPostUseCase.execute(id, currentUserId, isStaff);
 
       res.status(200).json({
         success: true,

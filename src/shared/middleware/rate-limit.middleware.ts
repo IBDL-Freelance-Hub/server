@@ -83,3 +83,11 @@ export const requestsRateLimiter = createRateLimiter({
   max: 20,
   message: 'Too many request submissions or modifications from this IP. Please try again later.',
 });
+
+// 7. Community Interactions Rate Limiter (Comments and Reactions): 30 requests per 1 minute
+export const communityInteractionRateLimiter = createRateLimiter({
+  windowMs: 60 * 1000,
+  max: 30,
+  message:
+    'Too many comments or reactions submitted from this IP. Please try again after 1 minute.',
+});

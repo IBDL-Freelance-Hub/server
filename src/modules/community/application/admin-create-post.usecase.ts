@@ -28,52 +28,55 @@ export class AdminCreatePostUseCase {
     const now = new Date();
     const publishedAt = status === PostStatus.PUBLISHED ? now : null;
 
-    const post = await this.prisma.$transaction(async (tx) => {
-      const created = await tx.communityPost.create({
-        data: {
-          authorId: actor.userId,
-          title: input.title.trim(),
-          content: input.content.trim(),
-          category,
-          status,
-          isPinned,
-          attachments: (input.attachments as unknown as Prisma.InputJsonValue) ?? Prisma.JsonNull,
-          publishedAt,
-        },
-        include: {
-          author: {
-            select: {
-              id: true,
-              email: true,
-              staff: { select: { role: true } },
-              member: { select: { fullNameEn: true } },
+    const post = await this.prisma.$transaction(
+      async (tx) => {
+        const created = await tx.communityPost.create({
+          data: {
+            authorId: actor.userId,
+            title: input.title.trim(),
+            content: input.content.trim(),
+            category,
+            status,
+            isPinned,
+            attachments: (input.attachments as unknown as Prisma.InputJsonValue) ?? Prisma.JsonNull,
+            publishedAt,
+          },
+          include: {
+            author: {
+              select: {
+                id: true,
+                email: true,
+                staff: { select: { role: true } },
+                member: { select: { fullNameEn: true } },
+              },
             },
           },
-        },
-      });
+        });
 
-      // Immutable Staff Audit Log
-      await tx.auditLog.create({
-        data: {
-          actorId: actor.userId,
-          actorRole: actor.role,
-          action: 'COMMUNITY_POST_CREATED',
-          resource: 'CommunityPost',
-          resourceId: created.id,
-          reason: `Created community post: "${created.title.substring(0, 40)}"`,
-          ipAddress: actor.ipAddress,
-          requestId: actor.requestId,
-          newState: {
-            title: created.title,
-            category: created.category,
-            status: created.status,
-            isPinned: created.isPinned,
+        // Immutable Staff Audit Log
+        await tx.auditLog.create({
+          data: {
+            actorId: actor.userId,
+            actorRole: actor.role,
+            action: 'COMMUNITY_POST_CREATED',
+            resource: 'CommunityPost',
+            resourceId: created.id,
+            reason: `Created community post: "${created.title.substring(0, 40)}"`,
+            ipAddress: actor.ipAddress,
+            requestId: actor.requestId,
+            newState: {
+              title: created.title,
+              category: created.category,
+              status: created.status,
+              isPinned: created.isPinned,
+            },
           },
-        },
-      });
+        });
 
-      return created;
-    });
+        return created;
+      },
+      { maxWait: 5000, timeout: 10000 },
+    );
 
     return post;
   }

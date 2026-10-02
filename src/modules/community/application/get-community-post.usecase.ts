@@ -6,7 +6,11 @@ import { CommunityPostDetailDTO, PostAttachment, PostCommentDTO } from '../domai
 export class GetCommunityPostUseCase {
   constructor(private readonly prisma: PrismaClient = defaultPrisma) {}
 
-  async execute(postId: string, currentUserId?: string): Promise<CommunityPostDetailDTO> {
+  async execute(
+    postId: string,
+    currentUserId?: string,
+    isStaff: boolean = false,
+  ): Promise<CommunityPostDetailDTO> {
     const post = await this.prisma.communityPost.findUnique({
       where: { id: postId },
       include: {
@@ -30,6 +34,7 @@ export class GetCommunityPostUseCase {
         },
         comments: {
           where: { isDeleted: false },
+          take: 100,
           orderBy: { createdAt: 'asc' },
           include: {
             user: {
@@ -46,6 +51,10 @@ export class GetCommunityPostUseCase {
     });
 
     if (!post || post.status === PostStatus.ARCHIVED) {
+      throw new NotFoundError(`Community post with ID '${postId}' not found.`);
+    }
+
+    if (!isStaff && post.status !== PostStatus.PUBLISHED) {
       throw new NotFoundError(`Community post with ID '${postId}' not found.`);
     }
 
