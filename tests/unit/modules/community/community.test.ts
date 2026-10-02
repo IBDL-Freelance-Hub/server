@@ -328,6 +328,61 @@ describe('Community & Announcements Module Unit Tests', () => {
         }),
       );
     });
+
+    it('moderateComment: should return idempotent success if comment is already soft-deleted', async () => {
+      mockReq.user = {
+        id: 'staff-1',
+        userType: 'STAFF',
+        staffRole: StaffRole.COMMUNITY_MODERATOR,
+      } as any;
+      mockReq.params = { commentId: 'comment-1' };
+      mockReq.query = {};
+
+      mockPrisma.postComment.findUnique.mockResolvedValue({
+        id: 'comment-1',
+        postId: 'post-1',
+        userId: 'spammer-1',
+        isDeleted: true,
+      });
+
+      await controller.moderateComment(mockReq as Request, mockRes as Response, mockNext);
+
+      expect(mockRes.status).toHaveBeenCalledWith(200);
+      expect(mockRes.json).toHaveBeenCalledWith(
+        expect.objectContaining({
+          success: true,
+          data: expect.objectContaining({ message: 'Comment is already moderated.' }),
+        }),
+      );
+      expect(mockPrisma.postComment.update).not.toHaveBeenCalled();
+    });
+
+    it('deletePost: should return idempotent success if post is already archived', async () => {
+      mockReq.user = {
+        id: 'staff-1',
+        userType: 'STAFF',
+        staffRole: StaffRole.COMMUNITY_MODERATOR,
+      } as any;
+      mockReq.params = { id: 'post-1' };
+      mockReq.query = { hard: 'false' };
+
+      mockPrisma.communityPost.findUnique.mockResolvedValue({
+        id: 'post-1',
+        title: 'Already Archived Post',
+        status: PostStatus.ARCHIVED,
+      });
+
+      await controller.deletePost(mockReq as Request, mockRes as Response, mockNext);
+
+      expect(mockRes.status).toHaveBeenCalledWith(200);
+      expect(mockRes.json).toHaveBeenCalledWith(
+        expect.objectContaining({
+          success: true,
+          data: expect.objectContaining({ message: 'Post is already archived.' }),
+        }),
+      );
+      expect(mockPrisma.communityPost.update).not.toHaveBeenCalled();
+    });
   });
 
   describe('3. CommunityController & Member Interactions', () => {

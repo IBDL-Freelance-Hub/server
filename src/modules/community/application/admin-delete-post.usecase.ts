@@ -7,16 +7,25 @@ export class AdminDeletePostUseCase {
   constructor(private readonly prisma: PrismaClient = defaultPrisma) {}
 
   async execute(postId: string, actor: ActorMeta, hardDelete: boolean = false) {
-    const existing = await this.prisma.communityPost.findUnique({
-      where: { id: postId },
-    });
-
-    if (!existing) {
-      throw new NotFoundError(`Community post with ID '${postId}' not found.`);
-    }
-
-    await this.prisma.$transaction(
+    return this.prisma.$transaction(
       async (tx) => {
+        const existing = await tx.communityPost.findUnique({
+          where: { id: postId },
+        });
+
+        if (!existing) {
+          throw new NotFoundError(`Community post with ID '${postId}' not found.`);
+        }
+
+        if (!hardDelete && existing.status === PostStatus.ARCHIVED) {
+          return {
+            id: postId,
+            deleted: true,
+            mode: 'ARCHIVED',
+            message: 'Post is already archived.',
+          };
+        }
+
         if (hardDelete) {
           await tx.communityPost.delete({
             where: { id: postId },
@@ -46,15 +55,15 @@ export class AdminDeletePostUseCase {
             },
           },
         });
+
+        return {
+          id: postId,
+          deleted: true,
+          mode: hardDelete ? 'HARD_DELETE' : 'ARCHIVED',
+          message: hardDelete ? 'Post permanently deleted.' : 'Post archived successfully.',
+        };
       },
       { maxWait: 5000, timeout: 10000 },
     );
-
-    return {
-      id: postId,
-      deleted: true,
-      mode: hardDelete ? 'HARD_DELETE' : 'ARCHIVED',
-      message: hardDelete ? 'Post permanently deleted.' : 'Post archived successfully.',
-    };
   }
 }

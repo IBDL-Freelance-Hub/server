@@ -7,16 +7,25 @@ export class AdminModerateCommentUseCase {
   constructor(private readonly prisma: PrismaClient = defaultPrisma) {}
 
   async execute(commentId: string, actor: ActorMeta, hardDelete: boolean = false) {
-    const existing = await this.prisma.postComment.findUnique({
-      where: { id: commentId },
-    });
-
-    if (!existing) {
-      throw new NotFoundError(`Comment with ID '${commentId}' not found.`);
-    }
-
-    await this.prisma.$transaction(
+    return this.prisma.$transaction(
       async (tx) => {
+        const existing = await tx.postComment.findUnique({
+          where: { id: commentId },
+        });
+
+        if (!existing) {
+          throw new NotFoundError(`Comment with ID '${commentId}' not found.`);
+        }
+
+        if (!hardDelete && existing.isDeleted) {
+          return {
+            id: commentId,
+            postId: existing.postId,
+            moderated: true,
+            message: 'Comment is already moderated.',
+          };
+        }
+
         if (hardDelete) {
           await tx.postComment.delete({
             where: { id: commentId },
@@ -47,15 +56,15 @@ export class AdminModerateCommentUseCase {
             },
           },
         });
+
+        return {
+          id: commentId,
+          postId: existing.postId,
+          moderated: true,
+          message: hardDelete ? 'Comment permanently deleted.' : 'Comment moderated successfully.',
+        };
       },
       { maxWait: 5000, timeout: 10000 },
     );
-
-    return {
-      id: commentId,
-      postId: existing.postId,
-      moderated: true,
-      message: 'Comment moderated successfully.',
-    };
   }
 }
