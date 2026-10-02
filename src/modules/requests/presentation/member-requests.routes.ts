@@ -6,6 +6,7 @@ import {
   requestIdOrRefParamSchema,
   cancelMemberRequestSchema,
   respondInfoMemberRequestSchema,
+  payMemberRequestSchema,
 } from './member-requests.schema';
 
 const router = Router();
@@ -49,6 +50,18 @@ router.post(
     body: respondInfoMemberRequestSchema,
   }),
   controller.respondInfo,
+);
+
+// POST /api/v1/requests/:id/pay — Pay for Request (Simulated Gateway)
+router.post(
+  '/:id/pay',
+  requestsRateLimiter,
+  requireAuth,
+  validateRequest({
+    params: requestIdOrRefParamSchema,
+    body: payMemberRequestSchema,
+  }),
+  controller.payRequest,
 );
 
 export const memberRequestsRouter = router;

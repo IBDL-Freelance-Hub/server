@@ -30,5 +30,12 @@ export const respondInfoMemberRequestSchema = z.object({
   updatedBrief: z.record(z.any()).optional(),
 });
 
+export const payMemberRequestSchema = z.object({
+  paymentMethodId: z.string().trim().optional(),
+  gatewayToken: z.string().trim().optional(),
+  paymentReference: z.string().trim().optional(),
+});
+
 export type ListMemberRequestsQueryInput = z.infer<typeof listMemberRequestsQuerySchema>;
 export type CancelMemberRequestInput = z.infer<typeof cancelMemberRequestSchema>;
+export type PayMemberRequestInput = z.infer<typeof payMemberRequestSchema>;

@@ -1,22 +1,20 @@
 import { PrismaClient, EngagementRequestStatus, PaymentMethod } from '@prisma/client';
 import { prisma as defaultPrisma } from '../../../shared/providers';
-import { NotFoundError, ValidationError, ConflictError } from '../../../shared/errors';
+import { NotFoundError, BusinessRuleError, ConflictError } from '../../../shared/errors';
 import { assertValidRequestTransition } from '../domain/request-state-machine';
 import {
   IRequestNotificationService,
   requestNotificationService as defaultNotificationService,
 } from './services/request-notification.service';
-import { AdminActorContext } from './admin-start-review.usecase';
 import { RecordTransactionUseCase } from '../../transactions/application/record-transaction.usecase';
 
-export interface AdminMarkPaidInput {
-  paymentRef?: string;
+export interface PayMemberRequestInput {
+  paymentMethodId?: string;
+  gatewayToken?: string;
   paymentReference?: string;
-  paidAmount?: number;
-  adminNotes?: string;
 }
 
-export interface AdminMarkPaidResult {
+export interface PayMemberRequestResult {
   id: string;
   referenceCode: string;
   status: EngagementRequestStatus;
@@ -27,7 +25,7 @@ export interface AdminMarkPaidResult {
   message: string;
 }
 
-export class AdminMarkPaidUseCase {
+export class PayMemberRequestUseCase {
   constructor(
     private readonly prisma: PrismaClient = defaultPrisma,
     private readonly notificationSvc: IRequestNotificationService = defaultNotificationService,
@@ -37,30 +35,29 @@ export class AdminMarkPaidUseCase {
   ) {}
 
   async execute(
+    userId: string,
     identifier: string,
-    input: AdminMarkPaidInput,
-    actor: AdminActorContext,
-  ): Promise<AdminMarkPaidResult> {
-    const refCode = (input.paymentRef || input.paymentReference)?.trim();
-    if (!refCode) {
-      throw new ValidationError('paymentRef (or paymentReference) is required to record payment.');
-    }
-
+    input: PayMemberRequestInput = {},
+    meta?: { ipAddress?: string; requestId?: string },
+  ): Promise<PayMemberRequestResult> {
     const request = await this.prisma.engagementRequest.findFirst({
       where: {
         OR: [{ id: identifier }, { referenceCode: identifier }],
       },
       include: {
         member: {
-          include: {
-            user: { select: { id: true, email: true } },
+          select: {
+            id: true,
+            userId: true,
+            fullNameEn: true,
+            user: { select: { email: true } },
           },
         },
         catalogItem: { select: { nameEn: true } },
       },
     });
 
-    if (!request) {
+    if (!request || request.member.userId !== userId) {
       throw new NotFoundError(`Engagement request '${identifier}' not found.`);
     }
 
@@ -69,16 +66,18 @@ export class AdminMarkPaidUseCase {
       request.status === EngagementRequestStatus.PAYMENT_CONFIRMED ||
       request.status === EngagementRequestStatus.FULFILLED
     ) {
-      const existingTx = await this.prisma.transaction.findUnique({
-        where: { paymentReference: request.paymentReference || refCode },
-        select: { invoiceNumber: true },
-      });
+      const existingTx = request.paymentReference
+        ? await this.prisma.transaction.findUnique({
+            where: { paymentReference: request.paymentReference },
+            select: { invoiceNumber: true },
+          })
+        : null;
 
       return {
         id: request.id,
         referenceCode: request.referenceCode,
         status: request.status,
-        paymentReference: request.paymentReference || refCode,
+        paymentReference: request.paymentReference || '',
         invoiceNumber: existingTx?.invoiceNumber,
         paidAt: (request.paidAt || new Date()).toISOString(),
         isIdempotent: true,
@@ -86,15 +85,22 @@ export class AdminMarkPaidUseCase {
       };
     }
 
-    // Assert valid transition to PAYMENT_CONFIRMED (e.g. from AWAITING_PAYMENT)
     assertValidRequestTransition(request.status, EngagementRequestStatus.PAYMENT_CONFIRMED);
 
+    if (request.status !== EngagementRequestStatus.AWAITING_PAYMENT) {
+      throw new BusinessRuleError(
+        `Request is in '${request.status}' status. Payment can only be initiated for requests in AWAITING_PAYMENT status.`,
+      );
+    }
+
+    // Simulate payment gateway interaction
+    const simulatedRef = `PAY-SIM-${Math.random().toString(36).substring(2, 10).toUpperCase()}`;
+    const paymentReference =
+      input.paymentReference?.trim() ||
+      input.gatewayToken?.trim() ||
+      input.paymentMethodId?.trim() ||
+      simulatedRef;
     const now = new Date();
-    const adminNotesCombined = input.adminNotes?.trim()
-      ? request.adminNotes
-        ? `${request.adminNotes}\n[Payment]: ${input.adminNotes.trim()}`
-        : `[Payment]: ${input.adminNotes.trim()}`
-      : request.adminNotes;
 
     const updated = await this.prisma.$transaction(
       async (tx) => {
@@ -102,9 +108,8 @@ export class AdminMarkPaidUseCase {
           where: { id: request.id, status: request.status },
           data: {
             status: EngagementRequestStatus.PAYMENT_CONFIRMED,
-            paymentReference: refCode,
+            paymentReference,
             paidAt: now,
-            adminNotes: adminNotesCombined,
           },
         });
 
@@ -114,23 +119,23 @@ export class AdminMarkPaidUseCase {
           );
         }
 
-        // Record in polymorphic transaction ledger if payable amount > 0
+        // Record transaction in ledger if payable amount > 0
         let invoiceNumber: string | undefined;
         const amountCents = Math.round(Number(request.finalPrice) * 100);
 
         if (amountCents > 0) {
           const txRecord = await this.recordTransactionUseCase.execute(
             {
-              userId: request.member.userId,
+              userId,
               sourceType: 'REQUEST',
               sourceId: request.id,
               amountCents,
               currency: request.currency || 'USD',
-              paymentMethod: PaymentMethod.ADMIN_MANUAL,
-              paymentReference: refCode,
+              paymentMethod: PaymentMethod.SIMULATED_GATEWAY,
+              paymentReference,
               billingDetails: {
                 memberName: request.member.fullNameEn,
-                email: request.member.user.email,
+                email: request.member.user?.email,
                 tier: request.tierAtRequest,
                 itemTitle: request.catalogItem.nameEn,
                 basePrice: Number(request.basePrice),
@@ -143,10 +148,10 @@ export class AdminMarkPaidUseCase {
               },
               paidAt: now,
               actorMeta: {
-                actorId: actor.userId,
-                actorRole: actor.staffRole,
-                ipAddress: actor.ipAddress,
-                requestId: actor.requestId,
+                actorId: userId,
+                actorRole: 'MEMBER',
+                ipAddress: meta?.ipAddress,
+                requestId: meta?.requestId,
               },
             },
             tx,
@@ -154,54 +159,56 @@ export class AdminMarkPaidUseCase {
           invoiceNumber = txRecord.invoiceNumber;
         }
 
-        // 1. Immutable Staff AuditLog (SEC-33)
+        // 1. Immutable Audit Log for Member Payment
         await tx.auditLog.create({
           data: {
-            actorId: actor.userId,
-            actorRole: actor.staffRole,
-            action: 'ADMIN_REQUEST_MARKED_PAID',
+            actorId: userId,
+            actorRole: 'MEMBER',
+            action: 'MEMBER_PAYMENT_INITIATED',
             resource: 'EngagementRequest',
             resourceId: request.id,
-            reason: input.adminNotes?.trim() || `Payment recorded ref: ${refCode}`,
-            ipAddress: actor.ipAddress,
-            requestId: actor.requestId,
-            previousState: { status: request.status, paymentReference: request.paymentReference },
+            ipAddress: meta?.ipAddress,
+            requestId: meta?.requestId,
+            reason: `Payment initiated and confirmed via simulated gateway. Ref: ${paymentReference}`,
+            previousState: { status: request.status },
             newState: {
               status: EngagementRequestStatus.PAYMENT_CONFIRMED,
-              paymentReference: refCode,
-              paidAt: now,
+              paymentReference,
+              paidAt: now.toISOString(),
               invoiceNumber,
             },
           },
         });
 
-        // 2. Member Activity Feed Timeline Entry (ACT-58)
+        // 2. Member Activity Feed Timeline Entry
         await tx.auditLog.create({
           data: {
-            actorId: request.member.userId,
+            actorId: userId,
             actorRole: 'MEMBER',
             action: 'REQUEST_PAYMENT_CONFIRMED',
             resource: 'EngagementRequest',
             resourceId: request.id,
-            reason: `Payment reference: ${refCode}`,
+            reason: `Payment successful. Reference: ${paymentReference}`,
             previousState: { status: request.status },
-            newState: { status: EngagementRequestStatus.PAYMENT_CONFIRMED },
+            newState: {
+              status: EngagementRequestStatus.PAYMENT_CONFIRMED,
+            },
           },
         });
 
-        // 3. Persist Notification in DB
+        // 3. Persist In-App Notification in DB
         const notifInput = {
-          userId: request.member.userId,
-          memberEmail: request.member.user.email,
+          userId,
+          memberEmail: request.member.user?.email,
           referenceCode: request.referenceCode,
           type: 'REQUEST_PAYMENT_CONFIRMED',
-          titleEn: 'Payment Confirmed',
-          titleAr: 'تم تأكيد استلام الدفعة',
-          messageEn: `Payment for request (${request.referenceCode}) has been confirmed (Ref: ${refCode}). Your request is now queued for fulfillment.`,
-          messageAr: `تم تأكيد استلام دفعة الطلب (${request.referenceCode}) بنجاح (المرجع: ${refCode}). الطلب الآن في مرحلة التنفيذ.`,
+          titleEn: 'Payment Successful',
+          titleAr: 'تمت عملية الدفع بنجاح',
+          messageEn: `Your payment for request (${request.referenceCode}) has been successfully processed (Invoice: ${invoiceNumber || 'N/A'}).`,
+          messageAr: `تمت معالجة الدفعة لطلبك (${request.referenceCode}) بنجاح.`,
           metadata: {
             requestId: request.id,
-            paymentReference: refCode,
+            paymentReference,
             invoiceNumber,
             status: EngagementRequestStatus.PAYMENT_CONFIRMED,
           },
@@ -212,7 +219,7 @@ export class AdminMarkPaidUseCase {
           id: request.id,
           referenceCode: request.referenceCode,
           status: EngagementRequestStatus.PAYMENT_CONFIRMED,
-          paymentReference: refCode,
+          paymentReference,
           invoiceNumber,
           paidAt: now,
           notifInput,
@@ -228,32 +235,11 @@ export class AdminMarkPaidUseCase {
       id: updated.id,
       referenceCode: updated.referenceCode,
       status: updated.status,
-      paymentReference: updated.paymentReference!,
+      paymentReference: updated.paymentReference,
       invoiceNumber: updated.invoiceNumber,
-      paidAt: updated.paidAt!.toISOString(),
+      paidAt: updated.paidAt.toISOString(),
       isIdempotent: false,
-      message: 'Payment recorded and confirmed successfully.',
+      message: 'Payment settled successfully.',
     };
   }
-}
-
-/**
- * Idempotent hook to mark an engagement request as paid.
- * Reuses AdminMarkPaidUseCase with system actor defaults.
- */
-export async function markRequestPaid(
-  requestId: string,
-  paymentRef: string,
-  adminNotes?: string,
-  actor: AdminActorContext = {
-    userId: 'SYSTEM',
-    staffRole: 'SYSTEM_ADMIN',
-    ipAddress: '127.0.0.1',
-    requestId: 'system-payment-hook',
-  },
-  prisma: PrismaClient = defaultPrisma,
-  notificationSvc: IRequestNotificationService = defaultNotificationService,
-): Promise<AdminMarkPaidResult> {
-  const useCase = new AdminMarkPaidUseCase(prisma, notificationSvc);
-  return useCase.execute(requestId, { paymentRef, adminNotes }, actor);
 }

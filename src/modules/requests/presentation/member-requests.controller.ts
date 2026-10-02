@@ -3,6 +3,7 @@ import { ListMemberRequestsUseCase } from '../application/list-member-requests.u
 import { GetMemberRequestByRefUseCase } from '../application/get-member-request-by-ref.usecase';
 import { CancelMemberRequestUseCase } from '../application/cancel-member-request.usecase';
 import { RespondInfoMemberRequestUseCase } from '../application/respond-info-member-request.usecase';
+import { PayMemberRequestUseCase } from '../application/pay-member-request.usecase';
 import { AuthenticationError, ValidationError } from '../../../shared/errors';
 import { getClientIp } from '../../../shared/utils';
 
@@ -12,6 +13,7 @@ export class MemberRequestsController {
     private readonly getMemberRequestByRefUseCase: GetMemberRequestByRefUseCase = new GetMemberRequestByRefUseCase(),
     private readonly cancelMemberRequestUseCase: CancelMemberRequestUseCase = new CancelMemberRequestUseCase(),
     private readonly respondInfoMemberRequestUseCase: RespondInfoMemberRequestUseCase = new RespondInfoMemberRequestUseCase(),
+    private readonly payMemberRequestUseCase: PayMemberRequestUseCase = new PayMemberRequestUseCase(),
   ) {}
 
   private getIdentifier(req: Request): string {
@@ -107,6 +109,29 @@ export class MemberRequestsController {
           requestId: req.id,
         },
       );
+
+      res.status(200).json({
+        success: true,
+        data: result,
+      });
+    } catch (error) {
+      next(error);
+    }
+  };
+
+  payRequest = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+    try {
+      if (!req.user) {
+        throw new AuthenticationError('Authentication required to pay for a request.');
+      }
+
+      const identifier = this.getIdentifier(req);
+      const clientIp = getClientIp(req);
+
+      const result = await this.payMemberRequestUseCase.execute(req.user.id, identifier, req.body, {
+        ipAddress: clientIp,
+        requestId: req.id,
+      });
 
       res.status(200).json({
         success: true,

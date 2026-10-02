@@ -117,6 +117,7 @@ model User {
   verificationTokens VerificationToken[]
   passwordHistory    PasswordHistory[]
   notifications      Notification[]
+  transactions       Transaction[]
 
   @@index([status, createdAt])
 }
@@ -434,4 +435,49 @@ model Notification {
 
   @@index([userId, isRead])
   @@index([userId, createdAt(sort: Desc)])
+}
+
+enum TransactionStatus {
+  PENDING
+  PAID
+  FAILED
+  REFUNDED
+}
+
+enum PaymentMethod {
+  SIMULATED_GATEWAY
+  CREDIT_CARD
+  BANK_TRANSFER
+  ADMIN_MANUAL
+}
+
+model Transaction {
+  id               String            @id @default(uuid())
+  invoiceNumber    String            @unique @map("invoice_number")
+  userId           String            @map("user_id")
+  sourceType       String            @map("source_type")
+  sourceId         String            @map("source_id")
+  amountCents      Int               @map("amount_cents")
+  currency         String            @default("USD")
+  status           TransactionStatus @default(PAID)
+  paymentMethod    PaymentMethod     @default(ADMIN_MANUAL) @map("payment_method")
+  paymentReference String            @unique @map("payment_reference")
+  billingDetails   Json              @map("billing_details")
+  paidAt           DateTime          @default(now()) @map("paid_at")
+  createdAt        DateTime          @default(now()) @map("created_at")
+
+  user             User              @relation(fields: [userId], references: [id], onDelete: Restrict)
+
+  @@index([userId, createdAt(sort: Desc)])
+  @@index([status])
+  @@index([sourceType, sourceId])
+  @@map("transactions")
+}
+
+model InvoiceSequenceCounter {
+  year      Int      @id
+  lastValue Int      @default(0)
+  updatedAt DateTime @updatedAt
+
+  @@map("invoice_sequence_counter")
 }

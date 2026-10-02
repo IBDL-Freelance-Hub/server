@@ -22,6 +22,8 @@ import { shopRouter } from './modules/requests/presentation/shop.routes';
 import { requestsRouter } from './modules/requests/presentation/requests.routes';
 import adminRequestsRouter from './modules/requests/presentation/admin-requests.routes';
 import { notificationsRouter } from './modules/notifications/presentation/notifications.routes';
+import { transactionsRouter } from './modules/transactions/presentation/transactions.routes';
+import { adminTransactionsRouter } from './modules/transactions/presentation/admin-transactions.routes';
 
 const app: Express = express();
 
@@ -142,6 +144,8 @@ app.use('/api/v1/shop', shopRouter);
 app.use('/api/v1/requests', requestsRouter);
 app.use('/api/v1/admin/requests', adminRequestsRouter);
 app.use('/api/v1/notifications', notificationsRouter);
+app.use('/api/v1/transactions', transactionsRouter);
+app.use('/api/v1/admin/transactions', adminTransactionsRouter);
 
 // 11. Catch-All 404 Route Handler
 app.use((req: Request, _res: Response, next: NextFunction) => {
