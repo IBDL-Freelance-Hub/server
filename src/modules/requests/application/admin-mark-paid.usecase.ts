@@ -160,3 +160,24 @@ export class AdminMarkPaidUseCase {
     };
   }
 }
+
+/**
+ * Idempotent hook to mark an engagement request as paid.
+ * Reuses AdminMarkPaidUseCase with system actor defaults.
+ */
+export async function markRequestPaid(
+  requestId: string,
+  paymentRef: string,
+  adminNotes?: string,
+  actor: AdminActorContext = {
+    userId: 'SYSTEM',
+    staffRole: 'SYSTEM_ADMIN',
+    ipAddress: '127.0.0.1',
+    requestId: 'system-payment-hook',
+  },
+  prisma: PrismaClient = defaultPrisma,
+  notificationSvc: IRequestNotificationService = defaultNotificationService,
+): Promise<AdminMarkPaidResult> {
+  const useCase = new AdminMarkPaidUseCase(prisma, notificationSvc);
+  return useCase.execute(requestId, { paymentRef, adminNotes }, actor);
+}

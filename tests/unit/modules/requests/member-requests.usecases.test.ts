@@ -9,6 +9,7 @@ import {
 import { ListMemberRequestsUseCase } from '../../../../src/modules/requests/application/list-member-requests.usecase';
 import { GetMemberRequestByRefUseCase } from '../../../../src/modules/requests/application/get-member-request-by-ref.usecase';
 import { CancelMemberRequestUseCase } from '../../../../src/modules/requests/application/cancel-member-request.usecase';
+import { RespondInfoMemberRequestUseCase } from '../../../../src/modules/requests/application/respond-info-member-request.usecase';
 import { IRequestNotificationService } from '../../../../src/modules/requests/application/services/request-notification.service';
 import { NotFoundError, BusinessRuleError } from '../../../../src/shared/errors';
 
@@ -18,6 +19,7 @@ describe('Member Requests, Tracking & Cancellation Unit Tests (Step 5)', () => {
   let listRequestsUseCase: ListMemberRequestsUseCase;
   let getRequestByRefUseCase: GetMemberRequestByRefUseCase;
   let cancelRequestUseCase: CancelMemberRequestUseCase;
+  let respondInfoUseCase: RespondInfoMemberRequestUseCase;
 
   const mockRequestRecord = {
     id: 'req-uuid-1',
@@ -109,6 +111,7 @@ describe('Member Requests, Tracking & Cancellation Unit Tests (Step 5)', () => {
     listRequestsUseCase = new ListMemberRequestsUseCase(mockPrisma);
     getRequestByRefUseCase = new GetMemberRequestByRefUseCase(mockPrisma);
     cancelRequestUseCase = new CancelMemberRequestUseCase(mockPrisma, mockNotificationSvc);
+    respondInfoUseCase = new RespondInfoMemberRequestUseCase(mockPrisma, mockNotificationSvc);
   });
 
   describe('1. ListMemberRequestsUseCase (Tenant Isolation & Enriched Query)', () => {
@@ -309,6 +312,98 @@ describe('Member Requests, Tracking & Cancellation Unit Tests (Step 5)', () => {
 
       await expect(
         cancelRequestUseCase.execute('user-uuid-1', 'NON-EXISTENT', {}, {}),
+      ).rejects.toThrow(NotFoundError);
+    });
+  });
+
+  describe('4. RespondInfoMemberRequestUseCase (State Transition & Notification)', () => {
+    it('should transition from AWAITING_RESPONSE to UNDER_REVIEW and dispatch bilingual notification', async () => {
+      const awaitingReq = {
+        ...mockRequestRecord,
+        status: EngagementRequestStatus.AWAITING_RESPONSE,
+        reviewNotes: '[Admin Note]: Please provide details',
+      };
+      (mockPrisma.engagementRequest.findFirst as jest.Mock).mockResolvedValue(awaitingReq);
+      (mockPrisma.engagementRequest.update as jest.Mock).mockImplementation(
+        async ({ data }: { data: unknown }) => ({
+          ...awaitingReq,
+          ...(data as object),
+        }),
+      );
+
+      const result = await respondInfoUseCase.execute(
+        'user-uuid-1',
+        'REQ-2026-A8K2',
+        {
+          responseNotes: 'Here is the requested additional information',
+          updatedBrief: { additionalRequirement: 'Extra detail' },
+        },
+        { ipAddress: '127.0.0.1', requestId: 'req-trace-123' },
+      );
+
+      expect(result.status).toBe(EngagementRequestStatus.UNDER_REVIEW);
+      expect(result.referenceCode).toBe('REQ-2026-A8K2');
+
+      // Audit Log for member action
+      expect(mockPrisma.auditLog.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({
+            actorId: 'user-uuid-1',
+            actorRole: 'MEMBER',
+            action: 'MEMBER_PROVIDED_INFO',
+            resource: 'EngagementRequest',
+          }),
+        }),
+      );
+
+      // Member Activity Feed entry
+      expect(mockPrisma.auditLog.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({
+            actorId: 'user-uuid-1',
+            actorRole: 'MEMBER',
+            action: 'REQUEST_INFO_PROVIDED',
+            resource: 'EngagementRequest',
+          }),
+        }),
+      );
+
+      // Bilingual Notification dispatch verification
+      expect(mockNotificationSvc.dispatchNotification).toHaveBeenCalledWith(
+        expect.objectContaining({
+          userId: 'user-uuid-1',
+          referenceCode: 'REQ-2026-A8K2',
+          type: 'REQUEST_INFO_PROVIDED',
+          titleEn: 'Information Submitted',
+          titleAr: 'تم تقديم المعلومات المطلوبة',
+          messageEn: expect.stringContaining('back under review'),
+          messageAr: expect.stringContaining('قيد المراجعة مجدداً'),
+          link: '/requests/REQ-2026-A8K2',
+        }),
+      );
+    });
+
+    it('should forbid responding if request status is not AWAITING_RESPONSE', async () => {
+      const notAwaitingReq = {
+        ...mockRequestRecord,
+        status: EngagementRequestStatus.UNDER_REVIEW,
+      };
+      (mockPrisma.engagementRequest.findFirst as jest.Mock).mockResolvedValue(notAwaitingReq);
+
+      await expect(
+        respondInfoUseCase.execute('user-uuid-1', notAwaitingReq.referenceCode, {
+          responseNotes: 'Extra note',
+        }),
+      ).rejects.toThrow(BusinessRuleError);
+    });
+
+    it('should throw NotFoundError if request does not exist or belongs to another user', async () => {
+      (mockPrisma.engagementRequest.findFirst as jest.Mock).mockResolvedValue(null);
+
+      await expect(
+        respondInfoUseCase.execute('user-uuid-1', 'NON-EXISTENT', {
+          responseNotes: 'Extra note',
+        }),
       ).rejects.toThrow(NotFoundError);
     });
   });

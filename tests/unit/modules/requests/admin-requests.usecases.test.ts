@@ -486,6 +486,18 @@ describe('Admin Endpoints & Transition Side-Effects (Step 4)', () => {
           }),
         }),
       );
+
+      expect(mockNotificationSvc.dispatchNotification).toHaveBeenCalledWith(
+        expect.objectContaining({
+          userId: 'user-member-1',
+          referenceCode: 'REQ-2026-0001',
+          type: 'REQUEST_PAYMENT_CONFIRMED',
+          titleEn: 'Payment Confirmed',
+          titleAr: 'تم تأكيد استلام الدفعة',
+          messageEn: expect.stringContaining('confirmed (Ref: TXN-BANK-998822)'),
+          messageAr: expect.stringContaining('تم تأكيد استلام دفعة الطلب'),
+        }),
+      );
     });
 
     it('should be idempotent and succeed without duplicate mutation if already PAYMENT_CONFIRMED', async () => {

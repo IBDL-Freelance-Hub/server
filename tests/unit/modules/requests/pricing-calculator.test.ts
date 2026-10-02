@@ -409,4 +409,98 @@ describe('PricingCalculator Pure Domain Unit Tests (MEM-13, MEM-33a, MEM-33b, BR
       expect(oddPercentage.finalPrice).toBe(141667);
     });
   });
+
+  describe('SHP-84 Master Quarterly Entitlement on Simulation Games & Event Licensing', () => {
+    // Target Hunter: Fixed $15.00 (1500 minor units) per trainee per event
+    // 40 trainees -> 40 * 1500 = 60000 cents ($600.00 standard event price)
+    const targetHunterUnitPrice = 1500;
+    const trainees = 40;
+    const eventBasePrice = targetHunterUnitPrice * trainees; // 60000 cents ($600.00)
+
+    it('Master, Target Hunter, 40 trainees, first request -> 0.00 (entire event free under quarterly entitlement)', () => {
+      const result = calculateApprovedPrice({
+        pricingModel: PricingModel.FIXED,
+        standardPrice: eventBasePrice,
+        tier: MembershipTier.MASTER,
+        membershipStatus: MembershipStatus.ACTIVE,
+        category: CatalogItemCategory.BUSINESS_SIMULATION,
+        isQuarterlyEntitlementEligible: true,
+      });
+
+      expect(result.basePrice).toBe(60000);
+      expect(result.discountPercentage).toBe(100.0);
+      expect(result.discountAmount).toBe(60000);
+      expect(result.finalPrice).toBe(0); // 0.00
+      expect(result.isQuarterlyEntitlementApplied).toBe(true);
+    });
+
+    it('Master, Target Hunter, 40 trainees, second request in same quarter -> 40 x 15 x 0.6 = 360.00 (36000 cents)', () => {
+      const result = calculateApprovedPrice({
+        pricingModel: PricingModel.FIXED,
+        standardPrice: eventBasePrice,
+        tier: MembershipTier.MASTER,
+        membershipStatus: MembershipStatus.ACTIVE,
+        category: CatalogItemCategory.BUSINESS_SIMULATION,
+        isQuarterlyEntitlementEligible: false,
+      });
+
+      expect(result.basePrice).toBe(60000);
+      expect(result.discountPercentage).toBe(40.0);
+      expect(result.discountAmount).toBe(24000);
+      expect(result.finalPrice).toBe(36000); // 360.00 USD
+      expect(result.isQuarterlyEntitlementApplied).toBe(false);
+    });
+
+    it('Professional member, same request (Target Hunter, 40 trainees) -> 40 x 15 x 0.7 = 420.00 (42000 cents)', () => {
+      const result = calculateApprovedPrice({
+        pricingModel: PricingModel.FIXED,
+        standardPrice: eventBasePrice,
+        tier: MembershipTier.PROFESSIONAL,
+        membershipStatus: MembershipStatus.ACTIVE,
+        category: CatalogItemCategory.BUSINESS_SIMULATION,
+      });
+
+      expect(result.basePrice).toBe(60000);
+      expect(result.discountPercentage).toBe(30.0);
+      expect(result.discountAmount).toBe(18000);
+      expect(result.finalPrice).toBe(42000); // 420.00 USD
+      expect(result.isQuarterlyEntitlementApplied).toBe(false);
+    });
+
+    it('Assessments quarterly case: Master first request in quarter is free, second in same quarter gets 40% discount', () => {
+      const assessmentLevel2Price = 7000; // $70.00 (Level 2)
+
+      // First request in quarter (entitlement available)
+      const firstInQuarter = calculateApprovedPrice({
+        pricingModel: PricingModel.FREE_THEN_PAID,
+        standardPrice: assessmentLevel2Price,
+        tier: MembershipTier.MASTER,
+        membershipStatus: MembershipStatus.ACTIVE,
+        category: CatalogItemCategory.DIAGNOSTIC_TOOL,
+        isFirstAssessmentUse: false,
+        isQuarterlyEntitlementEligible: true,
+      });
+
+      expect(firstInQuarter.basePrice).toBe(7000);
+      expect(firstInQuarter.finalPrice).toBe(0); // 0.00 USD
+      expect(firstInQuarter.isQuarterlyEntitlementApplied).toBe(true);
+
+      // Second request in same quarter (entitlement consumed -> 40% Master discount)
+      const secondInQuarter = calculateApprovedPrice({
+        pricingModel: PricingModel.FREE_THEN_PAID,
+        standardPrice: assessmentLevel2Price,
+        tier: MembershipTier.MASTER,
+        membershipStatus: MembershipStatus.ACTIVE,
+        category: CatalogItemCategory.DIAGNOSTIC_TOOL,
+        isFirstAssessmentUse: false,
+        isQuarterlyEntitlementEligible: false,
+      });
+
+      expect(secondInQuarter.basePrice).toBe(7000);
+      expect(secondInQuarter.discountPercentage).toBe(40.0);
+      expect(secondInQuarter.discountAmount).toBe(2800);
+      expect(secondInQuarter.finalPrice).toBe(4200); // 42.00 USD
+      expect(secondInQuarter.isQuarterlyEntitlementApplied).toBe(false);
+    });
+  });
 });

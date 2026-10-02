@@ -126,7 +126,7 @@ export const INITIAL_CATALOG_ITEMS = [
     category: CatalogItemCategory.CORE_SERVICE,
     pricingModel: PricingModel.PERCENTAGE,
     nameEn: 'Training Mode & Strategy Selection',
-    nameAr: 'اختيار نمط واستراتيجية التدريب',
+    nameAr: 'تحديد أساليب واستراتيجيات التدريب',
     descriptionEn:
       'Choose the right blend of delivery modes to maximize learning and commercial impact.',
     descriptionAr: 'اختيار المزيج الأمثل من أنماط التدريب لتحقيق أعلى أثر تدريبي وتجاري.',
@@ -184,7 +184,7 @@ export const INITIAL_CATALOG_ITEMS = [
     category: CatalogItemCategory.CORE_SERVICE,
     pricingModel: PricingModel.QUOTED,
     nameEn: 'Business Networking & Collaboration',
-    nameAr: 'التواصل والتعاون المهني بين المدربين',
+    nameAr: 'التواصل المهني والتعاون المشترك',
     descriptionEn:
       'Connect with peers, build delivery partnerships, and pursue larger opportunities together.',
     descriptionAr: 'بناء الشراكات والتواصل مع الزملاء للمنافسة على الفرص التدريبية الكبرى معاً.',
@@ -257,15 +257,17 @@ export const INITIAL_CATALOG_ITEMS = [
   },
 
   // ==========================================
-  // SECTION 3: 5 BUSINESS SIMULATION GAMES (category: BUSINESS_SIMULATION)
-  // Approved Pricing: 15 USD per trainee per event (1500 cents)
+  // SECTION 3: 8 BUSINESS SIMULATION GAMES (category: BUSINESS_SIMULATION)
+  // TEMPORARY: pending the full price file; spec SHP-10 had Micromatic, Mogul CEO and Maven as info-only
+  // All 8 games: PricingModel.FIXED, USD 15.00 (1500 minor units), unit: 'per trainee, per event'
+  // Capacities (60 for the first four, 20 for SynergyStack) stay as descriptive metadata only.
   // ==========================================
   {
-    slug: 'win-vs-war',
+    slug: 'strategic-victory',
     category: CatalogItemCategory.BUSINESS_SIMULATION,
     pricingModel: PricingModel.FIXED,
-    nameEn: 'Win vs. War',
-    nameAr: 'Win vs. War',
+    nameEn: 'Strategic Victory™',
+    nameAr: 'Strategic Victory™ - محاكاة معارك استراتيجية الأعمال',
     descriptionEn:
       'Full-day business leadership and strategy war-game simulation for up to 60 participants, including trainers, simulation, report, evaluation, and certificates.',
     descriptionAr:
@@ -274,7 +276,7 @@ export const INITIAL_CATALOG_ITEMS = [
     currency: 'USD',
     percentageRate: null,
     metadata: {
-      unit: '15 USD per trainee per event',
+      unit: 'per trainee, per event',
       focusAr: 'لعبة محاكاة للقيادة والإستراتيجية',
       capacity: 60,
     },
@@ -283,8 +285,8 @@ export const INITIAL_CATALOG_ITEMS = [
     slug: 'master-board-game',
     category: CatalogItemCategory.BUSINESS_SIMULATION,
     pricingModel: PricingModel.FIXED,
-    nameEn: 'Master Board Game',
-    nameAr: 'Master Board Game',
+    nameEn: 'Master Board Game™',
+    nameAr: 'Master Board Game™ - محاكاة أعمال تفاعلية شاملة',
     descriptionEn:
       'Full-day strategic planning and decision-making business simulation for up to 60 participants, including trainers, simulation, report, evaluation, and certificates.',
     descriptionAr:
@@ -293,7 +295,7 @@ export const INITIAL_CATALOG_ITEMS = [
     currency: 'USD',
     percentageRate: null,
     metadata: {
-      unit: '15 USD per trainee per event',
+      unit: 'per trainee, per event',
       focusAr: 'لعبة محاكاة للتخطيط الاستراتيجي واتخاذ القرارت',
       capacity: 60,
     },
@@ -302,8 +304,8 @@ export const INITIAL_CATALOG_ITEMS = [
     slug: 'sparta',
     category: CatalogItemCategory.BUSINESS_SIMULATION,
     pricingModel: PricingModel.FIXED,
-    nameEn: 'Sparta',
-    nameAr: 'Sparta',
+    nameEn: 'Sparta™',
+    nameAr: 'Sparta™ - توجيه وتدريب القياديين',
     descriptionEn:
       'Full-day coaching and leadership simulation for up to 60 participants, including trainers, simulation, report, evaluation, and certificates.',
     descriptionAr:
@@ -312,7 +314,7 @@ export const INITIAL_CATALOG_ITEMS = [
     currency: 'USD',
     percentageRate: null,
     metadata: {
-      unit: '15 USD per trainee per event',
+      unit: 'per trainee, per event',
       focusAr: 'لعبة محاكاة للكوتشنج والقيادة',
       capacity: 60,
     },
@@ -321,8 +323,8 @@ export const INITIAL_CATALOG_ITEMS = [
     slug: 'target-hunter',
     category: CatalogItemCategory.BUSINESS_SIMULATION,
     pricingModel: PricingModel.FIXED,
-    nameEn: 'Target Hunter',
-    nameAr: 'Target Hunter',
+    nameEn: 'Target Hunter™',
+    nameAr: 'Target Hunter™ - محاكاة أداء وتميز المبيعات',
     descriptionEn:
       'Full-day sales planning business simulation for up to 60 participants, including trainers, simulation, report, evaluation, and certificates.',
     descriptionAr:
@@ -331,7 +333,7 @@ export const INITIAL_CATALOG_ITEMS = [
     currency: 'USD',
     percentageRate: null,
     metadata: {
-      unit: '15 USD per trainee per event',
+      unit: 'per trainee, per event',
       focusAr: 'لعبة محاكاة لتخطيط المبيعات',
       capacity: 60,
     },
@@ -340,8 +342,8 @@ export const INITIAL_CATALOG_ITEMS = [
     slug: 'synergystack',
     category: CatalogItemCategory.BUSINESS_SIMULATION,
     pricingModel: PricingModel.FIXED,
-    nameEn: 'Synergy Stack',
-    nameAr: 'Synergy Stack',
+    nameEn: 'SynergyStack®',
+    nameAr: 'SynergyStack® - ورشة عمل ديناميكيات وتناغم الفرق',
     descriptionEn:
       'Online business simulation for up to 20 participants, optimizing teamwork, accelerating performance, and reducing stress, with dashboard tracking.',
     descriptionAr:
@@ -350,7 +352,7 @@ export const INITIAL_CATALOG_ITEMS = [
     currency: 'USD',
     percentageRate: null,
     metadata: {
-      unit: '15 USD per trainee per event',
+      unit: 'per trainee, per event',
       focusAr: 'لعبة تطوير الفريق الأمثل وتسريع أداء الفريق، وتقليل التوتر، والعمل معًا أفضل',
       capacity: 20,
     },
@@ -359,8 +361,8 @@ export const INITIAL_CATALOG_ITEMS = [
     slug: 'micromatic',
     category: CatalogItemCategory.BUSINESS_SIMULATION,
     pricingModel: PricingModel.FIXED,
-    nameEn: 'Micromatic',
-    nameAr: 'Micromatic',
+    nameEn: 'Micromatic™',
+    nameAr: 'Micromatic™ - محاكاة الإدارة الاستراتيجية',
     descriptionEn:
       'Business simulation game for up to 60 participants, including trainers, simulation, report, evaluation, and certificates.',
     descriptionAr:
@@ -369,17 +371,16 @@ export const INITIAL_CATALOG_ITEMS = [
     currency: 'USD',
     percentageRate: null,
     metadata: {
-      unit: '15 USD per trainee per event',
+      unit: 'per trainee, per event',
       focusAr: 'لعبة محاكاة للأعمال',
-      capacity: 60,
     },
   },
   {
     slug: 'mogul-ceo',
     category: CatalogItemCategory.BUSINESS_SIMULATION,
     pricingModel: PricingModel.FIXED,
-    nameEn: 'Mogul CEO',
-    nameAr: 'Mogul CEO',
+    nameEn: 'Mogul CEO™',
+    nameAr: 'Mogul CEO™ - لعبة محاكاة الرئيس التنفيذي',
     descriptionEn:
       'Business simulation game for up to 60 participants, including trainers, simulation, report, evaluation, and certificates.',
     descriptionAr:
@@ -388,17 +389,16 @@ export const INITIAL_CATALOG_ITEMS = [
     currency: 'USD',
     percentageRate: null,
     metadata: {
-      unit: '15 USD per trainee per event',
+      unit: 'per trainee, per event',
       focusAr: 'لعبة محاكاة لإدارة الشركات',
-      capacity: 60,
     },
   },
   {
     slug: 'maven',
     category: CatalogItemCategory.BUSINESS_SIMULATION,
     pricingModel: PricingModel.FIXED,
-    nameEn: 'Maven',
-    nameAr: 'Maven',
+    nameEn: 'Maven™',
+    nameAr: 'Maven™ - لعبة محاكاة التسويق الاستراتيجي',
     descriptionEn:
       'Business simulation game for up to 60 participants, including trainers, simulation, report, evaluation, and certificates.',
     descriptionAr:
@@ -407,9 +407,8 @@ export const INITIAL_CATALOG_ITEMS = [
     currency: 'USD',
     percentageRate: null,
     metadata: {
-      unit: '15 USD per trainee per event',
+      unit: 'per trainee, per event',
       focusAr: 'لعبة محاكاة استراتيجية',
-      capacity: 60,
     },
   },
 
@@ -424,8 +423,8 @@ export const INITIAL_CATALOG_ITEMS = [
     packageLevel: 'LEVEL_1',
     nameEn: 'PQP™ - Personality & Qualities Portfolio - Level 1',
     nameAr: 'PQP™ - محفظة الشخصية والصفات القيادية - المستوى الأول',
-    descriptionEn: 'L1 assessment process and individual report, for 20-100 candidates.',
-    descriptionAr: 'عملية تقييم وتقرير فردي من المستوى الأول، لـ 20-100 مرشح.',
+    descriptionEn: 'L1 assessment + individual report for 20-100 candidates.',
+    descriptionAr: 'تقييم المستوى الأول وتقرير فردي لـ 20-100 مرشح.',
     basePrice: 4000, // $40.00 in cents
     currency: 'USD',
     percentageRate: null,
@@ -443,9 +442,8 @@ export const INITIAL_CATALOG_ITEMS = [
     packageLevel: 'LEVEL_2',
     nameEn: 'PQP™ - Personality & Qualities Portfolio - Level 2',
     nameAr: 'PQP™ - محفظة الشخصية والصفات القيادية - المستوى الثاني',
-    descriptionEn: 'L2 adds a 45-minute online report-interpretation session with an IBDL expert.',
-    descriptionAr:
-      'يضيف المستوى الثاني جلسة عبر الإنترنت مدتها 45 دقيقة لتفسير التقرير مع خبير IBDL.',
+    descriptionEn: 'L2 adds a 45-minute online interpretation session.',
+    descriptionAr: 'يضيف المستوى الثاني جلسة عبر الإنترنت مدتها 45 دقيقة لتفسير التقرير.',
     basePrice: 7000, // $70.00 in cents
     currency: 'USD',
     percentageRate: null,
@@ -464,9 +462,9 @@ export const INITIAL_CATALOG_ITEMS = [
     nameEn: 'PQP™ - Personality & Qualities Portfolio - Level 3',
     nameAr: 'PQP™ - محفظة الشخصية والصفات القيادية - المستوى الثالث',
     descriptionEn:
-      'L3 adds report interpretation and four 60-minute online one-to-one coaching sessions to build an individual development plan.',
+      'L3 adds interpretation and four 60-minute one-to-one coaching sessions for an individual development plan.',
     descriptionAr:
-      'يضيف المستوى الثالث تفسير التقرير وأربع جلسات توجيه فردية عبر الإنترنت مدة كل منها 60 دقيقة لبناء خطة تطوير فردية.',
+      'يضيف المستوى الثالث تفسير التقرير وأربع جلسات توجيه فردية مدة كل منها 60 دقيقة لخطة تطوير فردية.',
     basePrice: 16000, // $160.00 in cents
     currency: 'USD',
     percentageRate: null,
@@ -486,8 +484,8 @@ export const INITIAL_CATALOG_ITEMS = [
     packageLevel: 'LEVEL_1',
     nameEn: 'CPAT™ - Change Profile & Adaptability Tool - Level 1',
     nameAr: 'CPAT™ - أداة تشخيص التكيّف والتغيير - المستوى الأول',
-    descriptionEn: 'L1 assessment process and individual report, for 20-100 candidates.',
-    descriptionAr: 'عملية تقييم وتقرير فردي من المستوى الأول، لـ 20-100 مرشح.',
+    descriptionEn: 'L1 assessment + individual report for 20-100 candidates.',
+    descriptionAr: 'تقييم المستوى الأول وتقرير فردي لـ 20-100 مرشح.',
     basePrice: 4000, // $40.00 in cents
     currency: 'USD',
     percentageRate: null,
@@ -505,9 +503,8 @@ export const INITIAL_CATALOG_ITEMS = [
     packageLevel: 'LEVEL_2',
     nameEn: 'CPAT™ - Change Profile & Adaptability Tool - Level 2',
     nameAr: 'CPAT™ - أداة تشخيص التكيّف والتغيير - المستوى الثاني',
-    descriptionEn: 'L2 adds a 45-minute online report-interpretation session with an IBDL expert.',
-    descriptionAr:
-      'يضيف المستوى الثاني جلسة عبر الإنترنت مدتها 45 دقيقة لتفسير التقرير مع خبير IBDL.',
+    descriptionEn: 'L2 adds a 45-minute online interpretation session.',
+    descriptionAr: 'يضيف المستوى الثاني جلسة عبر الإنترنت مدتها 45 دقيقة لتفسير التقرير.',
     basePrice: 7000, // $70.00 in cents
     currency: 'USD',
     percentageRate: null,
@@ -526,9 +523,9 @@ export const INITIAL_CATALOG_ITEMS = [
     nameEn: 'CPAT™ - Change Profile & Adaptability Tool - Level 3',
     nameAr: 'CPAT™ - أداة تشخيص التكيّف والتغيير - المستوى الثالث',
     descriptionEn:
-      'L3 adds report interpretation and four 60-minute online one-to-one coaching sessions to build an individual development plan.',
+      'L3 adds interpretation and four 60-minute one-to-one coaching sessions for an individual development plan.',
     descriptionAr:
-      'يضيف المستوى الثالث تفسير التقرير وأربع جلسات توجيه فردية عبر الإنترنت مدة كل منها 60 دقيقة لبناء خطة تطوير فردية.',
+      'يضيف المستوى الثالث تفسير التقرير وأربع جلسات توجيه فردية مدة كل منها 60 دقيقة لخطة تطوير فردية.',
     basePrice: 16000, // $160.00 in cents
     currency: 'USD',
     percentageRate: null,
@@ -540,16 +537,16 @@ export const INITIAL_CATALOG_ITEMS = [
     },
   },
 
-  // Management Drives® (Level 1: 15000, Level 2: 20000, Level 3: 40000 cents)
+  // Management Drives™ (Individual & Group Profiles) (Level 1: 15000, Level 2: 20000, Level 3: 40000 cents)
   {
     slug: 'management-drives',
     category: CatalogItemCategory.DIAGNOSTIC_TOOL,
     pricingModel: PricingModel.FREE_THEN_PAID,
     packageLevel: 'LEVEL_1',
-    nameEn: 'Management Drives® - Level 1',
-    nameAr: 'Management Drives® - المستوى الأول',
-    descriptionEn: 'L1 assessment process and individual report, for 20-100 candidates.',
-    descriptionAr: 'عملية تقييم وتقرير فردي من المستوى الأول، لـ 20-100 مرشح.',
+    nameEn: 'Management Drives™ (Individual & Group Profiles) - Level 1',
+    nameAr: 'Management Drives™ (تحليل ملفات الأفراد والفرق) - المستوى الأول',
+    descriptionEn: 'L1 assessment + individual report for 20-100 candidates.',
+    descriptionAr: 'تقييم المستوى الأول وتقرير فردي لـ 20-100 مرشح.',
     basePrice: 15000, // $150.00 in cents
     currency: 'USD',
     percentageRate: null,
@@ -565,11 +562,10 @@ export const INITIAL_CATALOG_ITEMS = [
     category: CatalogItemCategory.DIAGNOSTIC_TOOL,
     pricingModel: PricingModel.FREE_THEN_PAID,
     packageLevel: 'LEVEL_2',
-    nameEn: 'Management Drives® - Level 2',
-    nameAr: 'Management Drives® - المستوى الثاني',
-    descriptionEn: 'L2 adds a 45-minute online report-interpretation session with an IBDL expert.',
-    descriptionAr:
-      'يضيف المستوى الثاني جلسة عبر الإنترنت مدتها 45 دقيقة لتفسير التقرير مع خبير IBDL.',
+    nameEn: 'Management Drives™ (Individual & Group Profiles) - Level 2',
+    nameAr: 'Management Drives™ (تحليل ملفات الأفراد والفرق) - المستوى الثاني',
+    descriptionEn: 'L2 adds a 45-minute online interpretation session.',
+    descriptionAr: 'يضيف المستوى الثاني جلسة عبر الإنترنت مدتها 45 دقيقة لتفسير التقرير.',
     basePrice: 20000, // $200.00 in cents
     currency: 'USD',
     percentageRate: null,
@@ -585,12 +581,12 @@ export const INITIAL_CATALOG_ITEMS = [
     category: CatalogItemCategory.DIAGNOSTIC_TOOL,
     pricingModel: PricingModel.FREE_THEN_PAID,
     packageLevel: 'LEVEL_3',
-    nameEn: 'Management Drives® - Level 3',
-    nameAr: 'Management Drives® - المستوى الثالث',
+    nameEn: 'Management Drives™ (Individual & Group Profiles) - Level 3',
+    nameAr: 'Management Drives™ (تحليل ملفات الأفراد والفرق) - المستوى الثالث',
     descriptionEn:
-      'L3 adds report interpretation and four 60-minute online one-to-one coaching sessions to build an individual development plan.',
+      'L3 adds interpretation and four 60-minute one-to-one coaching sessions for an individual development plan.',
     descriptionAr:
-      'يضيف المستوى الثالث تفسير التقرير وأربع جلسات توجيه فردية عبر الإنترنت مدة كل منها 60 دقيقة لبناء خطة تطوير فردية.',
+      'يضيف المستوى الثالث تفسير التقرير وأربع جلسات توجيه فردية مدة كل منها 60 دقيقة لخطة تطوير فردية.',
     basePrice: 40000, // $400.00 in cents
     currency: 'USD',
     percentageRate: null,

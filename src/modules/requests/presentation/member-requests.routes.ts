@@ -5,7 +5,6 @@ import {
   listMemberRequestsQuerySchema,
   requestIdOrRefParamSchema,
   cancelMemberRequestSchema,
-  payMemberRequestSchema,
   respondInfoMemberRequestSchema,
 } from './member-requests.schema';
 
@@ -37,17 +36,6 @@ router.post(
     body: cancelMemberRequestSchema,
   }),
   controller.cancelRequest,
-);
-
-// POST /api/v1/requests/:id/pay — Initiate Payment Settlement
-router.post(
-  '/:id/pay',
-  requireAuth,
-  validateRequest({
-    params: requestIdOrRefParamSchema,
-    body: payMemberRequestSchema,
-  }),
-  controller.payRequest,
 );
 
 // POST /api/v1/requests/:id/respond-info — Respond to info request

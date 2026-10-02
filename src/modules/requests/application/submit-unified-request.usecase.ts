@@ -14,7 +14,10 @@ import {
   ConflictError,
 } from '../../../shared/errors';
 import { calculateItemPricing } from '../domain/pricing-calculator';
-import { getContractualQuarter } from '../domain/quarterly-entitlement';
+import {
+  getContractualQuarter,
+  isEligibleForMasterQuarterlyEntitlement,
+} from '../domain/quarterly-entitlement';
 import { generateRequestReference } from '../domain/reference-generator';
 
 export interface SubmitUnifiedRequestInput {
@@ -78,6 +81,13 @@ export class SubmitUnifiedRequestUseCase {
 
     if (!item) {
       throw new NotFoundError(`Catalog item with slug '${input.itemSlug}' not found.`);
+    }
+
+    // 2.5 Ensure item is requestable (items with PricingModel.NONE or IN_HUB are not requestable)
+    if (item.pricingModel === PricingModel.NONE || item.pricingModel === PricingModel.IN_HUB) {
+      throw new ValidationError(
+        `Catalog item '${item.nameEn}' has pricing model '${item.pricingModel}' and is not requestable.`,
+      );
     }
 
     // 3. REQ-14: Active duplicate request prevention
@@ -145,28 +155,56 @@ export class SubmitUnifiedRequestUseCase {
         });
         isFirstAssessmentUse = previousUsages === 0;
       }
+    }
 
-      // Master Quarterly Entitlement (MEM-14, MEM-16, MEM-76)
-      if (tier === MembershipTier.MASTER && membershipStatus === MembershipStatus.ACTIVE) {
-        quarterInfo = getContractualQuarter(currentMembership!.startDate, new Date());
+    // Master Quarterly Entitlement (BRU-47, MEM-14, MEM-16, MEM-76, SHP-84)
+    // Applies to both DIAGNOSTIC_TOOL and BUSINESS_SIMULATION when priced & active
+    const isEntitlementItem = isEligibleForMasterQuarterlyEntitlement({
+      category: item.category,
+      pricingModel: item.pricingModel,
+      isActive: item.isActive,
+    });
 
-        const activeQuarterUsages = await this.prisma.engagementRequest.count({
-          where: {
-            memberId: member.id,
-            isQuarterlyEntitlement: true,
-            quarterIndex: quarterInfo.quarterIndex,
-            membershipYear: quarterInfo.membershipYear,
-            status: {
-              notIn: [EngagementRequestStatus.CANCELLED, EngagementRequestStatus.REJECTED],
-            },
+    if (
+      tier === MembershipTier.MASTER &&
+      membershipStatus === MembershipStatus.ACTIVE &&
+      isEntitlementItem
+    ) {
+      quarterInfo = getContractualQuarter(currentMembership!.startDate, new Date());
+
+      const activeQuarterUsages = await this.prisma.engagementRequest.count({
+        where: {
+          memberId: member.id,
+          isQuarterlyEntitlement: true,
+          quarterIndex: quarterInfo.quarterIndex,
+          membershipYear: quarterInfo.membershipYear,
+          status: {
+            notIn: [EngagementRequestStatus.CANCELLED, EngagementRequestStatus.REJECTED],
           },
-        });
+        },
+      });
 
-        isQuarterlyEligible = activeQuarterUsages === 0;
+      isQuarterlyEligible = activeQuarterUsages === 0;
+    }
+
+    // Event license pricing for simulation games: unit * trainees (SHP-84)
+    let basePrice = Number(item.basePrice);
+    if (
+      item.category === CatalogItemCategory.BUSINESS_SIMULATION &&
+      item.pricingModel === PricingModel.FIXED
+    ) {
+      const trainees = Number(
+        input.brief?.['trainees'] ??
+          input.brief?.['traineeCount'] ??
+          input.brief?.['participants'] ??
+          input.brief?.['participantCount'] ??
+          1,
+      );
+      if (!isNaN(trainees) && trainees > 0) {
+        basePrice = basePrice * Math.round(trainees);
       }
     }
 
-    const basePrice = Number(item.basePrice);
     const pricing = calculateItemPricing({
       basePrice,
       category: item.category,

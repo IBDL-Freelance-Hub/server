@@ -198,4 +198,35 @@ describe('SubmitUnifiedRequestUseCase Unit Tests (REQ-14, SEC-33)', () => {
     expect(result.finalPrice).toBe(0);
     expect(result.isFirstUseFreeApplied).toBe(true);
   });
+
+  it('should reject requests for items with PricingModel.NONE as non-requestable', async () => {
+    (mockPrisma.member.findUnique as jest.Mock).mockResolvedValue({
+      id: 'member-1',
+      userId: 'user-1',
+      memberships: [{ tier: MembershipTier.ESSENTIAL, status: MembershipStatus.ACTIVE }],
+    });
+    (mockPrisma.catalogItem.findFirst as jest.Mock).mockResolvedValue({
+      id: 'item-none-1',
+      slug: 'info-only-game',
+      category: CatalogItemCategory.BUSINESS_SIMULATION,
+      pricingModel: PricingModel.NONE,
+      nameEn: 'Info-Only Simulation Game',
+      nameAr: 'لعبة للمعلومات فقط',
+      basePrice: 0,
+      currency: 'USD',
+      isActive: true,
+    });
+
+    await expect(
+      useCase.execute(
+        'user-1',
+        {
+          itemSlug: 'info-only-game',
+          brief: {},
+          acknowledgement: true,
+        },
+        {},
+      ),
+    ).rejects.toThrow(ValidationError);
+  });
 });

@@ -25,11 +25,6 @@ export const cancelMemberRequestSchema = z.object({
   reason: z.string().max(1000, 'Cancellation reason cannot exceed 1000 characters').optional(),
 });
 
-export const payMemberRequestSchema = z.object({
-  paymentMethodId: z.string().optional(),
-  gatewayToken: z.string().optional(),
-});
-
 export const respondInfoMemberRequestSchema = z.object({
   responseNotes: z.string().min(1, 'responseNotes is required').max(2000),
   updatedBrief: z.record(z.any()).optional(),

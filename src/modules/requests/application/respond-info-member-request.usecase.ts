@@ -2,6 +2,10 @@ import { PrismaClient, EngagementRequestStatus } from '@prisma/client';
 import { prisma as defaultPrisma } from '../../../shared/providers';
 import { NotFoundError, BusinessRuleError } from '../../../shared/errors';
 import { assertValidRequestTransition } from '../domain/request-state-machine';
+import {
+  IRequestNotificationService,
+  requestNotificationService as defaultNotificationService,
+} from './services/request-notification.service';
 
 export interface RespondInfoMemberRequestInput {
   responseNotes: string;
@@ -17,7 +21,10 @@ export interface RespondInfoMemberRequestResult {
 }
 
 export class RespondInfoMemberRequestUseCase {
-  constructor(private readonly prisma: PrismaClient = defaultPrisma) {}
+  constructor(
+    private readonly prisma: PrismaClient = defaultPrisma,
+    private readonly notificationSvc: IRequestNotificationService = defaultNotificationService,
+  ) {}
 
   async execute(
     userId: string,
@@ -30,7 +37,13 @@ export class RespondInfoMemberRequestUseCase {
         OR: [{ id: identifier }, { referenceCode: identifier }],
       },
       include: {
-        member: { select: { id: true, userId: true } },
+        member: {
+          select: {
+            id: true,
+            userId: true,
+            user: { select: { email: true } },
+          },
+        },
       },
     });
 
@@ -106,10 +119,21 @@ export class RespondInfoMemberRequestUseCase {
         },
       });
 
-      // We should potentially notify operations here if there's a staff notification system.
-      // (The prompt says: "notify operations reviewer")
-
       return rec;
+    });
+
+    // 3. Dispatch Member Notification
+    await this.notificationSvc.dispatchNotification({
+      userId: request.member.userId,
+      memberEmail: request.member.user?.email,
+      referenceCode: request.referenceCode,
+      type: 'REQUEST_INFO_PROVIDED',
+      titleEn: 'Information Submitted',
+      titleAr: 'تم تقديم المعلومات المطلوبة',
+      messageEn: `Additional information for request (${request.referenceCode}) has been submitted and is back under review.`,
+      messageAr: `تم تقديم المعلومات الإضافية للطلب (${request.referenceCode}) وهو الآن قيد المراجعة مجدداً.`,
+      link: `/requests/${request.referenceCode}`,
+      metadata: { requestId: request.id, status: EngagementRequestStatus.UNDER_REVIEW },
     });
 
     return {

@@ -27,10 +27,7 @@ export const ALLOWED_STATUS_TRANSITIONS: Record<
     EngagementRequestStatus.CANCELLED,
     EngagementRequestStatus.REJECTED,
   ],
-  [EngagementRequestStatus.PAYMENT_CONFIRMED]: [
-    EngagementRequestStatus.FULFILLED,
-    EngagementRequestStatus.REJECTED,
-  ],
+  [EngagementRequestStatus.PAYMENT_CONFIRMED]: [EngagementRequestStatus.FULFILLED],
   [EngagementRequestStatus.FULFILLED]: [], // Terminal state
   [EngagementRequestStatus.CANCELLED]: [], // Terminal closed state
   [EngagementRequestStatus.REJECTED]: [], // Terminal closed state
